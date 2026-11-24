@@ -47,6 +47,10 @@ ss.setdefault("chat", [])          # historie chatu
 ss.setdefault("models", None)
 ss.setdefault("job_text", "")
 ss.setdefault("job_url", "")
+NAV_VIEWS = ["📊 Přehled", "☑️ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil uchazeče",
+             "🔍 Průběh práce modelu"]
+ss.setdefault("view", NAV_VIEWS[0])
+ss.setdefault("last_view", NAV_VIEWS[0])
 MODE_URL, MODE_TEXT = "🔗 Odkaz", "📝 Vložit text"
 ss.setdefault("job_mode", MODE_URL)
 # Streamlit maže stav widgetů, které se v daném běhu nevykreslí (skryté pole URL/textu).
@@ -155,8 +159,9 @@ job_text_input = ss.job_text.strip() if job_mode == MODE_TEXT else ""
 has_job = bool(job_url or job_text_input)
 run = st.button("Analyzovat shodu →", type="primary", use_container_width=True,
                 disabled=not (upload and has_job))
+hint = st.empty()  # vždy stejné místo v rozvržení, i když je nápověda skrytá
 if not (upload and has_job):
-    st.caption("Nahrajte CV a zadejte inzerát – " +
+    hint.caption("Nahrajte CV a zadejte inzerát – " +
                ("vložte jeho text." if job_mode == MODE_TEXT else "vložte odkaz."))
 
 
@@ -214,6 +219,7 @@ def run_pipeline() -> None:
             ss.result = dict(cv=cv, profile=profile, job=job, job_src=job_src,
                              analysis=analysis, score=score, edits=edits, lang=lang)
             ss.chat = []
+            ss.view = ss.last_view = NAV_VIEWS[0]
             status.update(label=f"Hotovo · shoda {score.total} %", state="complete", expanded=False)
 
         except JobFetchError as e:
@@ -231,8 +237,12 @@ def run_pipeline() -> None:
                     st.code(e.detail)
 
 
-if run:
-    run_pipeline()
+# Pevný kontejner: výstup analýzy (průběh, chyby) má vždy stejné místo v rozvržení,
+# takže se při dalších rerunech neposouvají prvky pod ním (jinak Streamlit krátce
+# zobrazí staré i nové prvky najednou – "zdvojené" okno).
+with st.container():
+    if run:
+        run_pipeline()
 
 
 # ================================================================== výsledky
@@ -246,11 +256,24 @@ st.markdown(f"## {job.title}" + (f" · {job.company}" if job.company else ""))
 st.caption(f"Kandidát: **{profile.name or 'neuvedeno'}** · zdroj inzerátu: {R['job_src']} · "
            f"inzerát {lang_label(lang.posting)} · CV {lang_label(lang.cv)}")
 
-t_over, t_req, t_edit, t_chat, t_prof, t_log = st.tabs(
-    ["📊 Přehled", "☑️ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil uchazeče", "🔍 Průběh práce modelu"])
+# Navigace přes přepínač s klíčem místo st.tabs: st.tabs si vybranou záložku pamatuje jen
+# v prohlížeči a po každém rerunu (klik na tlačítko v chatu) skočí zpět na první záložku.
+# Přepínač ukládá volbu do session_state, takže uživatel zůstane tam, kde byl.
+V_OVER, V_REQ, V_EDIT, V_CHAT, V_PROF, V_LOG = NAV_VIEWS
+
+
+def _keep_view() -> None:
+    """Kliknutí na už vybranou položku by výběr zrušilo – v tom případě ho vrátíme."""
+    if ss.view is None:
+        ss.view = ss.last_view
+    ss.last_view = ss.view
+
+
+view = st.segmented_control("Zobrazení", NAV_VIEWS, key="view", on_change=_keep_view,
+                            label_visibility="collapsed") or ss.last_view
 
 # ------------------------------------------------------------------ přehled
-with t_over:
+if view == V_OVER:
     c1, c2 = st.columns([1, 2], gap="large")
     with c1:
         ui.score_ring(score.total, score.label, score.color)
@@ -273,7 +296,7 @@ with t_over:
         ui.card("Na co se pravděpodobně zeptají", ui.bullet_list(analysis.interview_questions))
 
 # ------------------------------------------------------------------ požadavky
-with t_req:
+if view == V_REQ:
     flt = st.segmented_control("Filtr", ["Vše", "Splněno", "Částečně", "Chybí"], default="Vše",
                                label_visibility="collapsed")
     want = {"Splněno": "met", "Částečně": "partial", "Chybí": "missing"}.get(flt or "Vše")
@@ -287,7 +310,7 @@ with t_req:
     ui.html("".join(rows) or '<div class="muted">Žádné požadavky v této kategorii.</div>')
 
 # ------------------------------------------------------------------ úpravy CV
-with t_edit:
+if view == V_EDIT:
     # --- jazyk úprav: automatické rozhodnutí + možnost přepnout
     lc1, lc2 = st.columns([3, 2], gap="large")
     with lc1:
@@ -330,7 +353,7 @@ with t_edit:
                            file_name="navrhy_uprav_cv.md", mime="text/markdown")
 
 # ------------------------------------------------------------------ chat
-with t_chat:
+if view == V_CHAT:
     st.caption("Kouč radí s CV, motivačním dopisem a přípravou na pozici. Texty pro zaměstnavatele píše "
                f"v jazyce {LANG_NAME[lang.target]}. Konverzace si pamatuje kontext.")
 
@@ -370,7 +393,7 @@ with t_chat:
         respond(prompt)
 
 # ------------------------------------------------------------------ profil
-with t_prof:
+if view == V_PROF:
     p1, p2 = st.columns([2, 1], gap="large")
     with p1:
         head = f"<b>{ui.escape(profile.headline or '')}</b>"
@@ -403,7 +426,7 @@ with t_prof:
                      caption=[f"strana {i + 1}" for i in range(len(cv.images))])
 
 # ------------------------------------------------------------------ průběh / náklady
-with t_log:
+if view == V_LOG:
     st.markdown("Každé volání modelu: kterou roli hrál, jak dlouho trvalo, kolik spotřeboval tokenů "
                 "a zda bylo potřeba opakování nebo záložní model.")
     if ss.logs:

@@ -11,6 +11,12 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.3.1] – 2026-11-24
+### Opraveno
+- Po kliknutí na rychlý dotaz v kariérním kouči se okno se záložkami zdvojilo
+  a po doběhnutí odpovědi aplikace skočila zpět na Přehled. Záložky (`st.tabs`)
+  nahradil přepínač, který si vybranou sekci pamatuje i po rerunu.
+
 ## [0.3.0] – 2026-11-24
 ### Přidáno
 - Filtr modelů: po otestování připojení se nabízejí jen modely, které prošly testy
@@ -42,7 +48,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.0...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.1.0...v0.2.0
