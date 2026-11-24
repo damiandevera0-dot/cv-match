@@ -354,7 +354,7 @@ if view == V_EDIT:
 
 # ------------------------------------------------------------------ chat
 if view == V_CHAT:
-    st.caption("Kouč radí s CV, motivačním dopisem a přípravou na pozici. Texty pro zaměstnavatele píše "
+    st.caption("AI kouč radí s CV, motivačním dopisem a přípravou na pozici. Texty pro zaměstnavatele píše "
                f"v jazyce {LANG_NAME[lang.target]}. Konverzace si pamatuje kontext.")
 
     chat_box = st.container(height=460)

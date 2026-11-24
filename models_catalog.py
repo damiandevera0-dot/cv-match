@@ -25,17 +25,17 @@ class ModelInfo:
 
 CATALOG: dict[str, ModelInfo] = {
     # ---- vhodné: prošly function calling, JSON módem i vision testem
+    "qwen3-vl:235b-a22b-instruct": ModelInfo(
+            "suitable", "🟢 nejsilnější, pomalý",
+            "Prošel všemi testy, ale je 3× pomalejší (33 s). Při vytížení serveru hrozí timeout."),
     "qwen3-vl:32b-instruct": ModelInfo(
-        "recommended", "⭐ doporučený",
+        "recommended", "🟢 silný a rychlý, záloha",
         "Prošel všemi testy, rychlý (function calling 9,5 s), umí vision."),
     "ministral-3-8b": ModelInfo(
-        "recommended", "⚡ nejrychlejší, záložní",
+        "recommended", "🔵 nejrychlejší",
         "Prošel všemi testy a je nejrychlejší (7,4 s). Malý model, hodnocení může být slabší."),
-    "qwen3-vl:235b-a22b-instruct": ModelInfo(
-        "suitable", "🧠 nejsilnější, pomalý",
-        "Prošel všemi testy, ale je 3× pomalejší (33 s). Při vytížení serveru hrozí timeout."),
     "gemma-4-12b-it": ModelInfo(
-        "suitable", "🐢 pomalejší",
+        "suitable", "🔵 pomalejší",
         "Prošel všemi testy, ale na svou velikost je pomalý (23 s)."),
     # ---- nevhodné: otestované, ale něco nesplnily
     "Qwen3.6-35B-A3B": ModelInfo(
@@ -58,8 +58,8 @@ CATALOG: dict[str, ModelInfo] = {
 # pořadí ve výběru: nejdřív doporučené, pak vhodné (v pořadí katalogu)
 _ORDER = {"recommended": 0, "suitable": 1}
 
-DEFAULT_MODEL = "qwen3-vl:32b-instruct"
-DEFAULT_FALLBACK = "ministral-3-8b"
+DEFAULT_MODEL = "qwen3-vl:235b-a22b-instruct"
+DEFAULT_FALLBACK = "qwen3-vl:32b-instruct"
 
 
 def info(model: str) -> ModelInfo | None:
