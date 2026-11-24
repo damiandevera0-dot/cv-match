@@ -20,7 +20,6 @@ class Provider:
     key_url: str = ""                 # kde klíč získat
     key_placeholder: str = ""
     url_editable: bool = False        # Ollama: vlastní adresa serveru
-    send_user: bool = False           # posílat parametr `user` (identifikace u školního serveru)
     connection_hint: str = "Zkontrolujte připojení k internetu."
     privacy: str = ""                 # kam odchází data CV
     key_setting: str = ""             # nepovinný název klíče v secrets.toml / proměnné prostředí
@@ -61,14 +60,6 @@ PROVIDERS: dict[str, Provider] = {
         connection_hint="Běží Ollama? Spusťte ji (aplikace Ollama nebo `ollama serve`) a zkontrolujte adresu.",
         privacy="CV zůstává ve vašem počítači – nic se neposílá ven.",
         preferred=(r"qwen[\d.]*-?vl", r"gemma\d", r"llava", r"vision"),
-    ),
-    "vse": Provider(
-        id="vse", name="VŠE (školní server)",
-        base_url="https://litellm.vse.cz/v1",
-        key_placeholder="sk-… (klíč z Moodlu)", send_user=True, key_setting="LITELLM_API_KEY",
-        test_workers=2,  # sdílený školní server
-        connection_hint="Jste připojeni ke školní síti nebo VPN VŠE?",
-        privacy="CV zůstává na školním serveru VŠE.",
     ),
 }
 

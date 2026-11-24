@@ -1,7 +1,8 @@
 """Test modelů a uložené výsledky ("katalog" modelů pro každého poskytovatele).
 
-U školního serveru víme, co na něm běží (models_catalog.py). U komerčních
-poskytovatelů a Ollamy ne – a modelů bývají desítky (Gemini ~50). Proto:
+U poskytovatelů modelů (OpenRouter, OpenAI, Gemini, Ollama) není předem jasné,
+které modely zvládají to, co aplikace potřebuje – a modelů bývají desítky
+(Gemini ~50). Proto:
 
   1. run_batch() otestuje VŠECHNY chatovací modely poskytovatele, paralelně,
      a každý model ohodnotí:
@@ -10,7 +11,7 @@ poskytovatelů a Ollamy ne – a modelů bývají desítky (Gemini ~50). Proto:
        * rychlost             – jak dlouho odpověď trvá
   2. Výsledky se uloží do model_catalogs/<poskytovatel>.json.
   3. Aplikace z této tabulky bere, které modely nabídnout a který předvybrat
-     (nejrychlejší plně vhodný) – stejně jako ve FIS verzi z models_catalog.py.
+     (nejrychlejší plně vhodný).
 
 Stejné funkce používá tlačítko v aplikaci i terminálový skript test_models.py.
 Test je schválně malý (krátký inzerát, malý obrázek): zlomky centu na model.
@@ -63,6 +64,7 @@ class ModelTestResult:
     vision_s: float = 0.0
     tokens: int = 0
     tested_at: str = ""
+    error: str = ""                 # úryvek chybové hlášky serveru (pro diagnostiku)
 
     @property
     def total_s(self) -> float:
@@ -106,6 +108,7 @@ class ModelTestResult:
             "Vision": "—" if self.vision_note == "netestováno"
                       else f"{STATUS_ICON[self.vision]} {self.vision_note}".strip(),
             "Čas [s]": round(self.total_s, 1), "Tokeny": self.tokens, "Otestováno": self.tested_at,
+            "Chyba serveru": self.error,
         }
 
 
@@ -156,11 +159,16 @@ def _classify(e: LLMError) -> tuple[str, str]:
 
 
 # ------------------------------------------------------------------ test jednoho modelu
-def run_model_test(base_url: str, api_key: str, model: str, user: Optional[str] = None,
+def _snippet(e: LLMError) -> str:
+    """Krátký úryvek chybové hlášky serveru, bez nadbytečných mezer."""
+    return re.sub(r"\s+", " ", e.detail or "")[:300]
+
+
+def run_model_test(base_url: str, api_key: str, model: str,
                    connection_hint: str = "") -> ModelTestResult:
     """Otestuje jeden model. Chyby zapíše do výsledku; vyhodí jen fatální LLMError."""
     res = ModelTestResult(model=model, tested_at=_now())
-    llm = LLMClient(base_url, api_key, model=model, user=user, timeout=90, quick=True,
+    llm = LLMClient(base_url, api_key, model=model, timeout=90, quick=True,
                     connection_hint=connection_hint or "Zkontrolujte připojení.")
 
     # 1) strukturovaný výstup
@@ -180,6 +188,7 @@ def run_model_test(base_url: str, api_key: str, model: str, user: Optional[str] 
             res.structured, res.structured_note = "fail", "nevrátil platný JSON"
         else:
             res.structured, res.structured_note = _classify(e)
+            res.error = _snippet(e)
     res.structured_s = time.time() - t0
 
     # 2) vision (u nevhodného / nedostupného modelu už nemá smysl volat API znovu)
@@ -207,6 +216,7 @@ def run_model_test(base_url: str, api_key: str, model: str, user: Optional[str] 
             if _is_fatal(e):
                 raise
             res.vision, res.vision_note = _classify(e)
+            res.error = _snippet(e)
         res.vision_s = time.time() - t0
     else:
         res.vision, res.vision_note = "fail", "netestováno"
@@ -216,7 +226,7 @@ def run_model_test(base_url: str, api_key: str, model: str, user: Optional[str] 
 
 
 # ------------------------------------------------------------------ hromadný test
-def run_batch(base_url: str, api_key: str, models: list[str], *, user: Optional[str] = None,
+def run_batch(base_url: str, api_key: str, models: list[str], *,
               connection_hint: str = "", workers: int = 3,
               on_result: Optional[Callable[[int, int, ModelTestResult], None]] = None,
               ) -> tuple[list[ModelTestResult], Optional[str]]:
@@ -227,7 +237,7 @@ def run_batch(base_url: str, api_key: str, models: list[str], *, user: Optional[
     results: list[ModelTestResult] = []
     fatal: Optional[str] = None
     with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
-        futures = {ex.submit(run_model_test, base_url, api_key, m, user, connection_hint): m
+        futures = {ex.submit(run_model_test, base_url, api_key, m, connection_hint): m
                    for m in models}
         for fut in as_completed(futures):
             try:

@@ -11,6 +11,25 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.8.0] – 2026-11-24
+Úklid: odstranění duplicit a školního serveru (ten má vlastní větev `vse-fis-school`).
+
+### Odebráno
+- Poskytovatel „VŠE (školní server)“ včetně loginu VŠE a parametru `user`.
+- Ruční katalog `models_catalog.py` a zvláštní výběr modelů pro VŠE; všichni poskytovatelé
+  teď používají jednu logiku – tabulku výsledků testu v `model_catalogs/`.
+
+### Změněno
+- Čtení nepovinného `secrets.toml` / proměnných prostředí je na jednom místě (`config.py`),
+  používá ho aplikace i `test_models.py`.
+- `pricing.PROVIDERS` přejmenováno na `PRICE_VENDORS`, aby se nepletlo s poskytovateli modelů
+  v `providers.PROVIDERS`.
+- `test_models.py`: parametr `--provider` je povinný.
+
+### Přidáno
+- Test modelů ukládá úryvek chybové hlášky serveru (sloupec „Chyba serveru“ v CSV),
+  aby šlo zjistit, proč model neodpověděl.
+
 ## [0.7.1] – 2026-11-24
 ### Opraveno
 - Test modelů označoval jako „nedostupný“ i modely, které pro daný klíč vůbec neexistují
@@ -139,7 +158,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.1...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.0...v0.6.1

@@ -1,4 +1,4 @@
-"""Klient pro libovolné OpenAI-kompatibilní API (OpenRouter, OpenAI, Gemini, Ollama, VŠE LiteLLM).
+"""Klient pro libovolné OpenAI-kompatibilní API (OpenRouter, OpenAI, Gemini, Ollama).
 
 Co tu je navíc oproti holému volání `client.chat.completions.create`:
   * structured()   – strukturovaný výstup přes function calling + validace Pydanticem
@@ -111,7 +111,6 @@ class LLMClient:
         api_key: str,
         model: str,
         fallback_model: Optional[str] = None,
-        user: Optional[str] = None,
         timeout: float = 120,
         on_event: Optional[Callable[[str], None]] = None,
         connection_hint: str = "Zkontrolujte připojení k internetu.",
@@ -125,7 +124,6 @@ class LLMClient:
         self._param_fixes: set[str] = set()  # úpravy parametrů, které si vyžádal server
         self.model = model
         self.fallback_model = fallback_model if fallback_model and fallback_model != model else None
-        self.user = user
         self.on_event = on_event or (lambda msg: None)  # UI si sem pověsí st.toast
         self.logs: list[CallLog] = []
 
@@ -164,8 +162,6 @@ class LLMClient:
         for model in models:
             for attempt in range(4):
                 try:
-                    if self.user:
-                        kwargs.setdefault("user", self.user)
                     log.model = model
                     return self.client.chat.completions.create(model=model, **kwargs)
 

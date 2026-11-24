@@ -6,7 +6,7 @@ proto používáme zdroje třetích stran, které ceny strojově publikují:
   1. OpenRouter Models API  – https://openrouter.ai/api/v1/models
      veřejné, bez klíče; ceny v USD za token (jako text). Primární zdroj.
   2. LiteLLM cost map       – model_prices_and_context_window.json na GitHubu
-     stejná mapa, podle které počítá ceny LiteLLM (na něm běží i litellm.vse.cz).
+     stejná mapa, podle které počítá ceny proxy LiteLLM.
      Záložní zdroj.
 
 Když nejsou dostupné ani jeden, vyhodí PricingError a UI nabídne ruční zadání.
@@ -25,8 +25,8 @@ LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_pric
 TIMEOUT = 10
 MAX_PAGES = 20
 
-# poskytovatelé, které porovnáváme: prefix v OpenRouteru / hodnota litellm_provider
-PROVIDERS = {
+# firmy, jejichž ceny porovnáváme (prefix v OpenRouteru) – nezaměňovat s providers.PRICE_VENDORS
+PRICE_VENDORS = {
     "openai": "OpenAI",
     "anthropic": "Anthropic",
     "google": "Google",
@@ -87,7 +87,7 @@ def fetch_openrouter() -> PriceList:
         for m in payload.get("data", []):
             mid = m.get("id", "")
             provider = mid.split("/", 1)[0]
-            if provider not in PROVIDERS or mid.endswith(":free"):
+            if provider not in PRICE_VENDORS or mid.endswith(":free"):
                 continue
             arch = m.get("architecture") or {}
             if "text" not in (arch.get("output_modalities") or ["text"]):
@@ -146,7 +146,7 @@ def default_selection(prices: PriceList, per_provider: int = 2) -> list[str]:
     if not any(m.created for m in prices.models):
         return []
     picked = []
-    for provider in PROVIDERS:
+    for provider in PRICE_VENDORS:
         newest = sorted((m for m in prices.models if m.provider == provider and m.created),
                         key=lambda m: m.created, reverse=True)
         picked += [m.model_id for m in newest[:per_provider]]

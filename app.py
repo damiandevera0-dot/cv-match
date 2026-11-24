@@ -1,4 +1,4 @@
-"""CV Match – porovnání CV s pracovním inzerátem pomocí LLM (OpenRouter, OpenAI, Gemini, Ollama, VŠE).
+"""CV Match – porovnání CV s pracovním inzerátem pomocí LLM (OpenRouter, OpenAI, Gemini, Ollama).
 
 Spuštění:  streamlit run app.py
 """
@@ -17,10 +17,10 @@ from cv_parser import CvParseError, parse_upload
 from job_fetcher import JobFetchError, fetch_job
 from llm import LLMClient, LLMError
 from version import __version__
-from pricing import PROVIDERS, PriceList, PricingError, cost_usd, default_selection, fetch_prices
+from pricing import PRICE_VENDORS, PriceList, PricingError, cost_usd, default_selection, fetch_prices
 
-from models_catalog import CATALOG, DEFAULT_FALLBACK, DEFAULT_MODEL, default_suitable, split_models
-from providers import PROVIDERS as LLM_PROVIDERS, normalize_model_ids, pick_default
+from config import read_setting
+from providers import PROVIDERS, normalize_model_ids, pick_default
 from model_tests import is_chat_model, load_results, rank, run_batch, save_results
 SAMPLE_JOB_PATH = os.path.join(os.path.dirname(__file__), "samples", "inzerat_ukazka.txt")
 
@@ -30,13 +30,13 @@ ui.inject_css()
 
 # ================================================================== konfigurace
 def setting(name: str, default: str = "") -> str:
-    """Hodnota z .streamlit/secrets.toml, jinak z proměnné prostředí."""
+    """Nepovinná hodnota: st.secrets (i Streamlit Cloud), jinak secrets.toml / prostředí (config.py)."""
     try:
-        if name in st.secrets:
+        if name and name in st.secrets:
             return str(st.secrets[name])
     except Exception:  # secrets.toml neexistuje
         pass
-    return os.environ.get(name, default)
+    return read_setting(name, default)
 
 
 
@@ -66,7 +66,6 @@ def make_llm(model: str, fallback: str | None) -> LLMClient:
     if not model:
         raise LLMError("Nejdřív v postranním panelu vyberte poskytovatele a model.")
     llm = LLMClient(base_url, api_key, model=model, fallback_model=fallback,
-                    user=(login or None) if prov.send_user else None,
                     on_event=lambda m: st.toast(m, icon="⚠️"), connection_hint=prov.connection_hint)
     llm.logs = ss.logs  # všechna volání do jednoho logu
     return llm
@@ -100,7 +99,6 @@ def render_model_tests(all_models: list[str], tested: dict) -> None:
                 bar.progress(i / n, text=f"{i}/{n} · {r.model}: {r.verdict[0]}")
 
             results, fatal = run_batch(base_url, api_key, todo,
-                                       user=(login or None) if prov.send_user else None,
                                        connection_hint=prov.connection_hint, workers=workers,
                                        on_result=on_result)
             if results:
@@ -126,9 +124,11 @@ with st.sidebar:
     st.markdown("### ⚙️ Nastavení")
 
     # --- poskytovatel a přístupové údaje
-    pid = st.selectbox("Poskytovatel modelů", list(LLM_PROVIDERS), key="provider",
-                       format_func=lambda p: LLM_PROVIDERS[p].name)
-    prov = LLM_PROVIDERS[pid]
+    if ss.get("provider") not in PROVIDERS:  # např. odebraný poskytovatel ze staré relace
+        ss.pop("provider", None)
+    pid = st.selectbox("Poskytovatel modelů", list(PROVIDERS), key="provider",
+                       format_func=lambda p: PROVIDERS[p].name)
+    prov = PROVIDERS[pid]
     if prov.url_editable:
         ss.setdefault(f"url_{pid}", prov.base_url)
         base_url = st.text_input("Adresa serveru", key=f"url_{pid}",
@@ -136,7 +136,7 @@ with st.sidebar:
     else:
         base_url = prov.base_url
 
-    api_key, login = "", ""
+    api_key = ""
     if prov.needs_key:
         api_key = st.text_input(
             "API klíč", type="password", key=f"key_{pid}", placeholder=prov.key_placeholder,
@@ -147,9 +147,6 @@ with st.sidebar:
             st.caption("Použit klíč ze `secrets.toml` / proměnné prostředí.")
         elif prov.key_url:
             st.caption(f"Klíč získáte na [{prov.key_url.split('/')[2]}]({prov.key_url}).")
-    if prov.send_user:
-        ss.setdefault("url_vse_login", setting("LITELLM_USER"))
-        login = st.text_input("Login VŠE (nepovinné)", key="url_vse_login", placeholder="xlogin00")
 
     can_connect = bool(api_key) or not prov.needs_key
     if st.button("🔌 Připojit a načíst modely", use_container_width=True, disabled=not can_connect):
@@ -165,19 +162,7 @@ with st.sidebar:
     model, fallback = None, None
     tested = load_results(pid)  # uložená tabulka výsledků testu (model_catalogs/<pid>.json)
     base_opts: list[str] = []
-    if pid == "vse":
-        # školní server: jen modely, které prošly testy (models_catalog.py)
-        if models_list is not None:
-            suitable, others = split_models(models_list)
-            st.success(f"Připojeno · na serveru {len(models_list)} modelů, vhodných {len(suitable)}")
-        else:
-            suitable, others = default_suitable(), []
-        show_all = st.toggle("Zobrazit i nevhodné modely", value=not suitable, disabled=not others,
-                             help="Modely, které neprošly testy, nebo nebyly otestované.")
-        options = suitable + (others if show_all else [])
-        base_opts = models_list or options
-        default_main, default_fb = DEFAULT_MODEL, DEFAULT_FALLBACK
-    elif models_list:
+    if models_list:
         base_opts = models_list
         if pid == "openrouter" and any(m.endswith(":free") for m in base_opts):
             if st.toggle("Jen bezplatné modely (:free)", key="or_free_only",
@@ -229,13 +214,6 @@ with st.sidebar:
     if models_list:
         render_model_tests(base_opts, tested)
 
-    if pid == "vse":
-        with st.expander("Proč jen tyto modely?"):
-            st.caption("Aplikace potřebuje strukturovaný výstup (function calling) a čtení obrázků (vision). "
-                       "Hodnocení vychází z `test_models.py`.")
-            rows = [f"- **{name}** · {i.badge}  \n  {i.reason}" for name, i in CATALOG.items()
-                    if models_list is None or name in models_list]
-            st.markdown("\n".join(rows))
     want_edits = st.toggle("Navrhnout úpravy CV", value=True, help="Jedno LLM volání navíc.")
 
     st.divider()
@@ -409,12 +387,12 @@ def render_costs(tin: int, tout: int) -> None:
 
     if prices:
         by_id = {m.model_id: m for m in prices.models}
-        options = sorted(by_id, key=lambda i: (list(PROVIDERS).index(by_id[i].provider), by_id[i].name))
+        options = sorted(by_id, key=lambda i: (list(PRICE_VENDORS).index(by_id[i].provider), by_id[i].name))
         if "price_models" not in ss or not set(ss.price_models) <= set(by_id):
             ss.price_models = [i for i in default_selection(prices) if i in by_id]
         chosen = st.multiselect(
             "Referenční modely", options, key="price_models",
-            format_func=lambda i: f"{PROVIDERS[by_id[i].provider]} · {by_id[i].name}",
+            format_func=lambda i: f"{PRICE_VENDORS[by_id[i].provider]} · {by_id[i].name}",
             placeholder="Vyberte modely ke srovnání…",
             help="Výchozí výběr: dva nejnovější modely každého poskytovatele.")
         if chosen:
@@ -423,7 +401,7 @@ def render_costs(tin: int, tout: int) -> None:
                 m = by_id[i]
                 session = cost_usd(m, tin, tout)
                 rows.append({
-                    "Model": m.name, "Poskytovatel": PROVIDERS[m.provider],
+                    "Model": m.name, "Poskytovatel": PRICE_VENDORS[m.provider],
                     "Vstup $/1M": round(m.input_per_m, 3), "Výstup $/1M": round(m.output_per_m, 3),
                     "Toto sezení ($)": round(session, 4), "1 000 sezení ($)": round(session * 1000, 2),
                 })
