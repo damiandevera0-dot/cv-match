@@ -21,7 +21,7 @@ from pricing import PROVIDERS, PriceList, PricingError, cost_usd, default_select
 
 from models_catalog import CATALOG, DEFAULT_FALLBACK, DEFAULT_MODEL, default_suitable, split_models
 from providers import PROVIDERS as LLM_PROVIDERS, normalize_model_ids, pick_default
-from model_tests import STATUS_ICON, run_model_test
+from model_tests import is_chat_model, load_results, rank, run_batch, save_results
 SAMPLE_JOB_PATH = os.path.join(os.path.dirname(__file__), "samples", "inzerat_ukazka.txt")
 
 st.set_page_config(page_title="CV Match", page_icon="🎯", layout="wide")
@@ -45,7 +45,6 @@ ss.setdefault("logs", [])          # log všech LLM volání (sdílený napří�
 ss.setdefault("result", None)      # výsledek poslední analýzy
 ss.setdefault("chat", [])          # historie chatu
 ss.setdefault("models_by", {})     # načtené modely pro každého poskytovatele
-ss.setdefault("model_tests", {})   # výsledky testů modelů: (poskytovatel, model) → ModelTestResult
 ss.setdefault("job_text", "")
 ss.setdefault("job_url", "")
 NAV_VIEWS = ["📊 Přehled", "☑️ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil uchazeče",
@@ -73,36 +72,53 @@ def make_llm(model: str, fallback: str | None) -> LLMClient:
     return llm
 
 
-def render_model_tests(options: list[str], preselected: list[str]) -> None:
-    """Test vybraných modelů u aktuálního poskytovatele (strukturovaný výstup, vision, rychlost)."""
-    with st.expander("🧪 Otestovat modely"):
-        st.caption("Ověří, jestli model zvládá strukturovaný výstup a čtení obrázků. Jeden model = "
-                   "2 krátká volání API: u placených modelů zlomky centu, u bezplatných se počítají "
-                   "do denního limitu.")
-        to_test = st.multiselect("Modely k otestování", options, default=preselected, max_selections=5)
-        if st.button("Spustit test", disabled=not to_test, use_container_width=True):
-            bar = st.progress(0.0)
-            for i, m in enumerate(to_test):
-                bar.progress(i / len(to_test), text=f"Testuji {m}…")
-                try:
-                    ss.model_tests[(pid, m)] = run_model_test(
-                        base_url, api_key, m, user=(login or None) if prov.send_user else None,
-                        connection_hint=prov.connection_hint)
-                except LLMError as e:  # server nedostupný / špatný klíč → nemá smysl pokračovat
-                    st.error(e.user_message)
-                    break
-            bar.empty()
-        results = [ss.model_tests[(pid, m)] for m in options if (pid, m) in ss.model_tests]
-        if results:
-            for r in results:
-                st.markdown(f"**{r.model}** · {r.verdict[0]}  \n"
-                            f"<span style='font-size:.8rem;color:#6b7085'>struktura: "
-                            f"{STATUS_ICON[r.structured]} {r.structured_note} · vision: "
-                            f"{STATUS_ICON[r.vision]} {r.vision_note} · "
-                            f"{r.structured_s + r.vision_s:.0f} s</span>", unsafe_allow_html=True)
-            csv = pd.DataFrame([r.as_row() for r in results]).to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Výsledky (CSV)", csv, file_name=f"test_modelu_{pid}.csv",
-                               mime="text/csv", use_container_width=True)
+def render_model_tests(all_models: list[str], tested: dict) -> None:
+    """Hromadný test modelů poskytovatele. Výsledky se ukládají do model_catalogs/<poskytovatel>.json
+    a aplikace z nich bere, které modely nabídnout a který předvybrat."""
+    chat_models = [m for m in all_models if is_chat_model(m)]
+    done = [m for m in chat_models if m in tested]
+    with st.expander(f"🧪 Test modelů ({len(done)}/{len(chat_models)} otestováno)", expanded=not done):
+        st.caption(f"Poskytovatel nabízí {len(all_models)} modelů, z toho {len(chat_models)} chatovacích "
+                   "(embedding, obrázkové, audio a podobné modely se netestují). Každý model = nejvýš "
+                   "2 krátká volání: u placených zlomky centu, u bezplatných se počítají do denního limitu.")
+        pending = [m for m in chat_models if m not in tested or tested[m].tier == 3]
+        scopes = {f"Neotestované a nedostupné ({len(pending)})": pending,
+                  f"Všechny chatovací ({len(chat_models)})": chat_models,
+                  "Vybrané…": None}
+        scope = st.radio("Co otestovat", list(scopes), key=f"test_scope_{pid}")
+        todo = scopes[scope]
+        if todo is None:
+            todo = st.multiselect("Modely", chat_models, key=f"test_pick_{pid}")
+        workers = prov.test_workers
+        if todo:
+            est = -(-len(todo) // workers) * 15  # hrubý odhad: ~15 s na model, paralelně
+            st.caption(f"Odhad: ~{max(1, round(est / 60))} min ({workers} modely najednou).")
+        if st.button(f"▶️ Spustit test ({len(todo or [])})", disabled=not todo, use_container_width=True):
+            bar = st.progress(0.0, text="Spouštím test…")
+
+            def on_result(i: int, n: int, r) -> None:
+                bar.progress(i / n, text=f"{i}/{n} · {r.model}: {r.verdict[0]}")
+
+            results, fatal = run_batch(base_url, api_key, todo,
+                                       user=(login or None) if prov.send_user else None,
+                                       connection_hint=prov.connection_hint, workers=workers,
+                                       on_result=on_result)
+            if results:
+                save_results(pid, results)
+            if fatal:
+                st.error(f"Test přerušen: {fatal} (uloženo {len(results)} výsledků)")
+            else:
+                st.rerun()
+
+        rows = [r.as_row() for r in rank(tested[m] for m in all_models if m in tested)]
+        if rows:
+            df = pd.DataFrame(rows)
+            st.dataframe(df[["Model", "Verdikt", "Čas [s]"]], hide_index=True, height=260,
+                         use_container_width=True)
+            st.download_button("⬇️ Celá tabulka (CSV)", df.to_csv(index=False).encode("utf-8"),
+                               file_name=f"test_modelu_{pid}.csv", mime="text/csv",
+                               use_container_width=True)
+            st.caption(f"Uloženo v `model_catalogs/{pid}.json`.")
 
 
 # ================================================================== sidebar
@@ -147,6 +163,8 @@ with st.sidebar:
 
     # --- výběr modelu
     model, fallback = None, None
+    tested = load_results(pid)  # uložená tabulka výsledků testu (model_catalogs/<pid>.json)
+    base_opts: list[str] = []
     if pid == "vse":
         # školní server: jen modely, které prošly testy (models_catalog.py)
         if models_list is not None:
@@ -157,15 +175,32 @@ with st.sidebar:
         show_all = st.toggle("Zobrazit i nevhodné modely", value=not suitable, disabled=not others,
                              help="Modely, které neprošly testy, nebo nebyly otestované.")
         options = suitable + (others if show_all else [])
+        base_opts = models_list or options
         default_main, default_fb = DEFAULT_MODEL, DEFAULT_FALLBACK
     elif models_list:
-        st.success(f"Připojeno · {len(models_list)} modelů")
-        options = models_list
-        if pid == "openrouter" and any(m.endswith(":free") for m in options):
+        base_opts = models_list
+        if pid == "openrouter" and any(m.endswith(":free") for m in base_opts):
             if st.toggle("Jen bezplatné modely (:free)", key="or_free_only",
                          help="Bez nákupu kreditů fungují jen modely s příponou :free (s denním limitem)."):
-                options = [m for m in options if m.endswith(":free")]
-        default_main, default_fb = pick_default(prov, options), None
+                base_opts = [m for m in base_opts if m.endswith(":free")]
+        # z tabulky výsledků testu: nabídnout vhodné modely, nejrychlejší první
+        ranked = rank(tested[m] for m in base_opts if m in tested)
+        suitable = [r.model for r in ranked if r.suitable]
+        if suitable:
+            st.success(f"Připojeno · {len(base_opts)} modelů, otestováno {len(ranked)}, "
+                       f"vhodných {len(suitable)}")
+            others = [m for m in base_opts if m not in suitable]
+            show_all = st.toggle("Zobrazit i netestované a nevhodné", key=f"show_all_{pid}",
+                                 disabled=not others)
+            options = suitable + (others if show_all else [])
+            default_main = suitable[0]
+            default_fb = suitable[1] if len(suitable) > 1 else None
+        else:
+            st.success(f"Připojeno · {len(base_opts)} modelů")
+            st.info("Modely zatím nejsou otestované. Spusťte **🧪 Test modelů** níže – pak se nabídnou "
+                    "jen vhodné a předvybere se nejrychlejší.")
+            options = base_opts
+            default_main, default_fb = pick_default(prov, options), None
     else:
         options = []
         if models_list is not None:
@@ -185,12 +220,14 @@ with st.sidebar:
         fallback = None if fb.startswith("—") else fb
 
         # výsledek testu zvoleného modelu (pokud proběhl)
-        tested = ss.model_tests.get((pid, model))
-        if tested:
-            label, why = tested.verdict
-            (st.warning if not label.startswith("✅") else st.caption)(f"Test modelu: {label} – {why}")
+        if model in tested:
+            r = tested[model]
+            label, why = r.verdict
+            (st.warning if not label.startswith("✅") else st.caption)(
+                f"Test modelu: {label} ({r.total_s:.0f} s) – {why}")
 
-        render_model_tests(options, [m for m in (model, fallback) if m])
+    if models_list:
+        render_model_tests(base_opts, tested)
 
     if pid == "vse":
         with st.expander("Proč jen tyto modely?"):
@@ -278,8 +315,8 @@ def run_pipeline() -> None:
             st.write(f"   ↳ {info}, {cv.pages} str.{extra}")
             for w in cv.warnings:
                 st.warning(w)
-            tested = ss.model_tests.get((pid, model))
-            if cv.images and tested and tested.vision != "ok":
+            tested_model = load_results(pid).get(model)
+            if cv.images and tested_model and tested_model.vision != "ok":
                 st.warning(f"Model {model} v testu nepřečetl obrázek – sken / fotka CV nejspíš selže. "
                            "Zvolte model s vision, nebo nahrajte textové PDF.")
 

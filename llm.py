@@ -29,10 +29,11 @@ THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 class LLMError(Exception):
     """Chyba srozumitelná pro uživatele (zobrazí se v UI)."""
 
-    def __init__(self, user_message: str, detail: str = ""):
+    def __init__(self, user_message: str, detail: str = "", status: Optional[int] = None):
         super().__init__(user_message)
         self.user_message = user_message
         self.detail = detail
+        self.status = status  # HTTP kód poslední chyby (pokud byl)
 
 
 @dataclass
@@ -114,11 +115,13 @@ class LLMClient:
         timeout: float = 120,
         on_event: Optional[Callable[[str], None]] = None,
         connection_hint: str = "Zkontrolujte připojení k internetu.",
+        quick: bool = False,
     ):
         # Ollama klíč nepotřebuje, ale knihovna openai vyžaduje neprázdnou hodnotu.
         self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed", timeout=timeout,
                              max_retries=0)
         self.connection_hint = connection_hint
+        self.quick = quick  # test modelů: při 429 nečekat a neopakovat (výsledek = "limit")
         self._param_fixes: set[str] = set()  # úpravy parametrů, které si vyžádal server
         self.model = model
         self.fallback_model = fallback_model if fallback_model and fallback_model != model else None
@@ -178,6 +181,9 @@ class LLMClient:
 
                 except openai.RateLimitError as e:  # 429 – sdílený klíč je přetížený
                     last_exc = e
+                    if self.quick:
+                        log.notes.append(f"{model}: 429")
+                        break
                     wait = 5 * (attempt + 1)
                     log.notes.append(f"{model}: 429, čekám {wait} s")
                     self.on_event(f"Server je vytížený, zkouším znovu za {wait} s…")
@@ -210,7 +216,7 @@ class LLMClient:
         raise LLMError(
             "Model se nepodařilo zavolat ani po opakování (server je vytížený nebo model není dostupný). "
             "Zkuste to za chvíli nebo zvolte jiný model.",
-            repr(last_exc),
+            repr(last_exc), status=getattr(last_exc, "status_code", None),
         )
 
     @staticmethod

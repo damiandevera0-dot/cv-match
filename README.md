@@ -29,11 +29,18 @@ V postranním panelu aplikace zvolte poskytovatele, vložte API klíč a klikně
 
 Všichni poskytovatelé mají OpenAI-kompatibilní API, takže aplikace používá jednu knihovnu (`openai`) a liší se jen adresa a klíč. Pokud server nepodporuje některý parametr (např. `max_tokens` u novějších modelů OpenAI), aplikace ho podle chybové hlášky sama upraví.
 
-U komerčních poskytovatelů a Ollamy není předem jasné, který model zvládá function calling a čtení obrázků. V postranním panelu je proto **🧪 Otestovat modely**: dvě krátká volání na model a verdikt (vhodný / jen textová PDF / nevhodný).
-
 Pro pohodlí při vývoji jde klíč uložit i do `.streamlit/secrets.toml` (viz `secrets.toml.example`) – pole na stránce pak může zůstat prázdné.
 
-Modely jde otestovat tlačítkem **🧪 Otestovat modely** v aplikaci, nebo hromadně z terminálu přes `python test_models.py` (např. `--provider gemini --models gemini-3.8-flash`, nebo `--all` pro všechny modely serveru). Oba způsoby používají stejný test (`model_tests.py`) a výsledek ukládají do CSV.
+### Test modelů a tabulka výsledků
+
+Komerční poskytovatelé mají desítky modelů (Gemini kolem 50) a předem není jasné, které zvládají function calling a čtení obrázků. Aplikace je proto umí otestovat hromadně:
+
+- **V aplikaci:** po připojení v postranním panelu **🧪 Test modelů** → „Neotestované“ / „Všechny chatovací“ / „Vybrané“. Modely se testují paralelně (u Gemini 4 najednou), embedding, obrázkové a audio modely se přeskočí.
+- **Z terminálu:** `python test_models.py --provider gemini --all` (dále `--models …`, `--free-only` pro OpenRouter, `--out soubor.csv`).
+
+Oba způsoby používají stejný test (`model_tests.py`) a ukládají výsledky do stejné tabulky **`model_catalogs/<poskytovatel>.json`**. Z ní aplikace bere, které modely nabídnout (jen vhodné) a který předvybrat (nejrychlejší vhodný), podobně jako FIS verze z ručního katalogu `models_catalog.py`. Modely, které neodpověděly kvůli dočasné chybě (**⏳ zkusit znovu**: limit 429, přetížení 5xx), se při dalším testu „Neotestované a nedostupné“ zkusí znovu. Modely **🚫 nedostupné pro účet** (pro váš klíč neexistují nebo nejsou v bezplatné vrstvě) se znovu netestují.
+
+Tabulka neobsahuje žádné klíče, takže ji můžete commitnout do gitu. Kdo si projekt stáhne, uvidí rovnou otestované modely.
 
 ## Struktura
 
@@ -49,7 +56,7 @@ Modely jde otestovat tlačítkem **🧪 Otestovat modely** v aplikaci, nebo hrom
 | `lang.py` | rozpoznání jazyka (čeština/angličtina) heuristikou, bez volání modelu |
 | `pricing.py` | aktuální ceny komerčních API (OpenRouter Models API, záložně LiteLLM cost map) |
 | `providers.py` | poskytovatelé modelů (adresa, klíč, výchozí model, poznámka o soukromí) |
-| `model_tests.py` | test modelu přímo v aplikaci (strukturovaný výstup, vision, rychlost) |
+| `model_tests.py` | test modelů (paralelní), ukládání a řazení výsledků v `model_catalogs/` |
 | `test_models.py` | hromadný test modelů z terminálu (libovolný poskytovatel), stejný test jako v aplikaci |
 
 ### Jazyk úprav CV

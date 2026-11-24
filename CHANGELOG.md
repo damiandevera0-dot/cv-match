@@ -11,6 +11,39 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.7.1] – 2026-11-24
+### Opraveno
+- Test modelů označoval jako „nedostupný“ i modely, které pro daný klíč vůbec neexistují
+  nebo nejsou v bezplatné vrstvě. Nový stav **🚫 nedostupný pro účet** (HTTP 404, 403,
+  429 s kvótou 0) se při „Neotestované a nedostupné“ znovu netestuje; **⏳ zkusit znovu**
+  zůstává pro dočasné chyby (429 limit, 5xx, timeout). U každého modelu je vidět HTTP kód.
+- „Přemýšlecí“ modely (např. Gemini 3) vracely v testu vision prázdnou odpověď, protože
+  limit tokenů spotřebovaly na skryté uvažování. Test teď dává modelům víc tokenů.
+- Při testu se na limit 429 nečeká opakovaně (dřív až ~50 s na model); model dostane
+  „⏳ zkusit znovu“ a test pokračuje dalším.
+- Model, u kterého test vision nestihl odpovědět, už není chybně označen „jen textová PDF“.
+
+### Změněno
+- Gemini: test běží po 2 modelech najednou (šetrnější k limitům bezplatné vrstvy).
+- Obrázkové modely „Nano Banana“ se netestují.
+
+## [0.7.0] – 2026-11-24
+### Přidáno
+- Hromadný test modelů: „🧪 Test modelů“ otestuje všechny chatovací modely poskytovatele
+  (nebo jen neotestované / vybrané) paralelně, s průběhem a odhadem času. Embedding, obrázkové
+  a audio modely se přeskočí.
+- Tabulka výsledků `model_catalogs/<poskytovatel>.json`, sdílená aplikací i `test_models.py`.
+  Aplikace z ní nabízí jen vhodné modely a předvybere nejrychlejší vhodný (záloha = druhý);
+  přepínač „Zobrazit i netestované a nevhodné“.
+- Nový stav „⏳ nedostupný“ pro modely, které při testu neodpověděly (vytížené, limit) –
+  nepovažují se za nevhodné a dají se přetestovat.
+- `test_models.py --workers` (počet paralelních testů) a `--out` (navíc CSV).
+
+### Změněno
+- Výsledky testu se ukládají do souboru místo do paměti relace, takže vydrží restart aplikace.
+- Nevhodnému modelu se už netestuje vision (ušetří volání API).
+- `test_models.py --all` testuje jen chatovací modely.
+
 ## [0.6.1] – 2026-11-24
 ### Změněno
 - Sjednocený test modelů: `test_models.py` je teď jen terminálová obálka nad stejnou funkcí
@@ -106,7 +139,9 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.1...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...v0.5.0
