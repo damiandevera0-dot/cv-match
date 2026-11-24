@@ -2,7 +2,7 @@
 
 Semestrální práce 4IZ233 Generativní AI, téma 2: středně složitá aplikace.
 
-Webová aplikace (Streamlit), která porovná **CV z LinkedIn** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem. Běží nad školním LLM serverem `litellm.vse.cz`.
+Webová aplikace (Streamlit), která porovná **CV** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem. Běží nad školním LLM serverem `litellm.vse.cz`.
 
 ## Spuštění
 
