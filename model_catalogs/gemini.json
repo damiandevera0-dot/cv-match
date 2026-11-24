@@ -1,119 +1,93 @@
 {
  "provider": "gemini",
- "updated_at": "2026-11-24 16:01 UTC",
+ "updated_at": "2026-11-24 16:15 UTC",
  "results": [
   {
-   "model": "gemini-3.6-flash",
+   "model": "gemini-flash-lite-latest",
    "structured": "ok",
    "structured_note": "function calling (5 pož.)",
-   "structured_s": 7.96,
+   "structured_s": 1.09,
    "vision": "ok",
    "vision_note": "",
-   "vision_s": 1.33,
-   "tokens": 2020,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "vision_s": 1.45,
+   "tokens": 2017,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": ""
   },
   {
-   "model": "gemini-3.5-flash",
+   "model": "gemini-3.5-flash-lite",
    "structured": "ok",
    "structured_note": "function calling (5 pož.)",
-   "structured_s": 19.46,
+   "structured_s": 1.01,
    "vision": "ok",
    "vision_note": "",
-   "vision_s": 2.96,
-   "tokens": 2015,
-   "tested_at": "2026-11-24 16:00 UTC"
+   "vision_s": 1.87,
+   "tokens": 2011,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": ""
   },
   {
    "model": "gemini-3.1-pro-preview",
    "structured": "busy",
    "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.2,
+   "structured_s": 0.21,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:00 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
+  },
+  {
+   "model": "gemini-3.7-flash",
+   "structured": "busy",
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.24,
+   "vision": "fail",
+   "vision_note": "netestováno",
+   "vision_s": 0.0,
+   "tokens": 0,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
+  },
+  {
+   "model": "gemini-flash-latest",
+   "structured": "busy",
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.24,
+   "vision": "fail",
+   "vision_note": "netestováno",
+   "vision_s": 0.0,
+   "tokens": 0,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
+  },
+  {
+   "model": "gemini-3.6-flash",
+   "structured": "busy",
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.25,
+   "vision": "fail",
+   "vision_note": "netestováno",
+   "vision_s": 0.0,
+   "tokens": 0,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
+  },
+  {
+   "model": "gemini-3.8-flash",
+   "structured": "busy",
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.26,
+   "vision": "fail",
+   "vision_note": "netestováno",
+   "vision_s": 0.0,
+   "tokens": 0,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
    "model": "gemini-4-carbon",
-   "structured": "busy",
-   "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.2,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
-  },
-  {
-   "model": "gemini-omni-1.1-flash",
-   "structured": "busy",
-   "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.21,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
-  },
-  {
-   "model": "gemini-3.1-pro-preview-customtools",
-   "structured": "busy",
-   "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.21,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 16:00 UTC"
-  },
-  {
-   "model": "gemini-4-neon",
-   "structured": "busy",
-   "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.22,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
-  },
-  {
-   "model": "gemini-pro-latest",
-   "structured": "busy",
-   "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.22,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
-  },
-  {
-   "model": "gemini-omni-1.2-flash",
-   "structured": "busy",
-   "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.22,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
-  },
-  {
-   "model": "gemini-4-argon",
-   "structured": "busy",
-   "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 0.22,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
-  },
-  {
-   "model": "gemini-omni-flash-preview",
    "structured": "busy",
    "structured_note": "limit požadavků (HTTP 429)",
    "structured_s": 0.27,
@@ -121,95 +95,140 @@
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
-   "model": "gemini-flash-latest",
+   "model": "gemini-3.1-pro-preview-customtools",
    "structured": "busy",
    "structured_note": "limit požadavků (HTTP 429)",
-   "structured_s": 3.77,
+   "structured_s": 0.28,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
-   "model": "gemini-4-hydrogen",
+   "model": "gemini-4-neon",
    "structured": "busy",
-   "structured_note": "neodpověděl (HTTP 503)",
-   "structured_s": 3.86,
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.29,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
-   "model": "gemini-3.7-flash",
+   "model": "gemini-omni-flash-preview",
    "structured": "busy",
-   "structured_note": "neodpověděl (HTTP 503)",
-   "structured_s": 3.9,
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.3,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
-   "model": "gemini-3.8-flash",
+   "model": "gemini-omni-1.1-flash",
    "structured": "busy",
-   "structured_note": "neodpověděl (HTTP 503)",
-   "structured_s": 4.21,
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.31,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
-   "model": "gemini-3.1-flash-lite-preview",
+   "model": "gemini-pro-latest",
    "structured": "busy",
-   "structured_note": "neodpověděl (HTTP 503)",
-   "structured_s": 4.69,
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.33,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:00 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
-   "model": "gemini-flash-lite-latest",
+   "model": "gemini-omni-1.2-flash",
    "structured": "busy",
-   "structured_note": "neodpověděl (HTTP 503)",
-   "structured_s": 4.99,
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.35,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
+  },
+  {
+   "model": "gemini-4-argon",
+   "structured": "busy",
+   "structured_note": "limit požadavků (HTTP 429)",
+   "structured_s": 0.65,
+   "vision": "fail",
+   "vision_note": "netestováno",
+   "vision_s": 0.0,
+   "tokens": 0,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
   },
   {
    "model": "gemini-3.1-flash-lite",
    "structured": "busy",
    "structured_note": "neodpověděl (HTTP 503)",
-   "structured_s": 25.35,
+   "structured_s": 3.74,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 15:59 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "InternalServerError('Error code: 503')"
   },
   {
-   "model": "gemini-3.5-flash-lite",
+   "model": "gemini-4-hydrogen",
    "structured": "busy",
    "structured_note": "neodpověděl (HTTP 503)",
-   "structured_s": 42.08,
+   "structured_s": 4.01,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:00 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "InternalServerError('Error code: 503')"
+  },
+  {
+   "model": "gemini-3.5-flash",
+   "structured": "ok",
+   "structured_note": "function calling (5 pož.)",
+   "structured_s": 4.91,
+   "vision": "busy",
+   "vision_note": "limit požadavků (HTTP 429)",
+   "vision_s": 0.22,
+   "tokens": 927,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "RateLimitError('Error code: 429')"
+  },
+  {
+   "model": "gemini-3.1-flash-lite-preview",
+   "structured": "busy",
+   "structured_note": "neodpověděl (HTTP 503)",
+   "structured_s": 6.27,
+   "vision": "fail",
+   "vision_note": "netestováno",
+   "vision_s": 0.0,
+   "tokens": 0,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "InternalServerError('Error code: 503')"
   },
   {
    "model": "gemini-3-flash-preview",
@@ -220,21 +239,23 @@
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 15:59 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "APITimeoutError('Request timed out.')"
   },
   {
-   "model": "gemini-decision-1",
+   "model": "gemini-2.5-pro",
    "structured": "na",
    "structured_note": "model neexistuje / byl vypnut (HTTP 404)",
-   "structured_s": 0.28,
+   "structured_s": 0.27,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 16:01 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "NotFoundError('Error code: 404')"
   },
   {
-   "model": "gemini-2.5-pro",
+   "model": "gemini-2.5-flash-lite",
    "structured": "na",
    "structured_note": "model neexistuje / byl vypnut (HTTP 404)",
    "structured_s": 0.29,
@@ -242,29 +263,32 @@
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 15:59 UTC"
-  },
-  {
-   "model": "gemini-2.5-flash-lite",
-   "structured": "na",
-   "structured_note": "model neexistuje / byl vypnut (HTTP 404)",
-   "structured_s": 0.35,
-   "vision": "fail",
-   "vision_note": "netestováno",
-   "vision_s": 0.0,
-   "tokens": 0,
-   "tested_at": "2026-11-24 15:59 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "NotFoundError('Error code: 404')"
   },
   {
    "model": "gemini-2.5-flash",
    "structured": "na",
    "structured_note": "model neexistuje / byl vypnut (HTTP 404)",
-   "structured_s": 0.35,
+   "structured_s": 0.29,
    "vision": "fail",
    "vision_note": "netestováno",
    "vision_s": 0.0,
    "tokens": 0,
-   "tested_at": "2026-11-24 15:59 UTC"
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "NotFoundError('Error code: 404')"
+  },
+  {
+   "model": "gemini-decision-1",
+   "structured": "na",
+   "structured_note": "model neexistuje / byl vypnut (HTTP 404)",
+   "structured_s": 0.49,
+   "vision": "fail",
+   "vision_note": "netestováno",
+   "vision_s": 0.0,
+   "tokens": 0,
+   "tested_at": "2026-11-24 16:14 UTC",
+   "error": "NotFoundError('Error code: 404')"
   }
  ]
 }

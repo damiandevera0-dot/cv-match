@@ -204,13 +204,6 @@ with st.sidebar:
                           index=fb_options.index(default_fb) if default_fb in fb_options else 0)
         fallback = None if fb.startswith("—") else fb
 
-        # výsledek testu zvoleného modelu (pokud proběhl)
-        if model in tested:
-            r = tested[model]
-            label, why = r.verdict
-            (st.warning if not label.startswith("✅") else st.caption)(
-                f"Test modelu: {label} ({r.total_s:.0f} s) – {why}")
-
     if models_list:
         render_model_tests(base_opts, tested)
 
