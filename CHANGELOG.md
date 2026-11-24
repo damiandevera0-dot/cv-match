@@ -14,6 +14,12 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [1.0.1] – 2026-11-24
+### Změněno
+- Výchozí hlavní model je `qwen3-vl:235b-a22b-instruct` (nejkvalitnější), záložní
+  `qwen3-vl:32b-instruct` (stejná rodina, 3× rychlejší). Ve výběru jsou teď v tomto pořadí nahoře.
+- README: zdůvodnění volby modelů podle nového nastavení.
+
 ## [1.0.0] – 2026-11-24
 Verze pro obhajobu semestrální práce. Funkčně odpovídá 0.4.0.
 
@@ -78,7 +84,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/vse-v1.0.0...vse-fis-school
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/vse-v1.0.1...vse-fis-school
+[1.0.1]: https://github.com/damiandevera0-dot/cv-match/compare/vse-v1.0.0...vse-v1.0.1
 [1.0.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...vse-v1.0.0
 [0.4.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...v0.3.2

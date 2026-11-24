@@ -26,8 +26,9 @@ class ModelInfo:
 CATALOG: dict[str, ModelInfo] = {
     # ---- vhodné: prošly function calling, JSON módem i vision testem
     "qwen3-vl:235b-a22b-instruct": ModelInfo(
-            "suitable", "🟢 nejsilnější, pomalý",
-            "Prošel všemi testy, ale je 3× pomalejší (33 s). Při vytížení serveru hrozí timeout."),
+        "recommended", "🟢 nejsilnější, hlavní",
+        "Prošel všemi testy a jako největší model dává nejkvalitnější hodnocení. Je 3× pomalejší "
+        "(33 s), proto má jako zálohu rychlejší qwen3-vl:32b-instruct."),
     "qwen3-vl:32b-instruct": ModelInfo(
         "recommended", "🟢 silný a rychlý, záloha",
         "Prošel všemi testy, rychlý (function calling 9,5 s), umí vision."),

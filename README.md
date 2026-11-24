@@ -65,20 +65,21 @@ Aplikace určí jazyk inzerátu a CV a podle pravidel zvolí, v jakém jazyce na
 
 **Proč tento stack:** Streamlit, protože celé UI je v Pythonu a zadání klade důraz na použitelnost, ne na technologii. Knihovna `openai` funguje se školním serverem (OpenAI-kompatibilní API) a stejný kód poběží i s komerčním API.
 
-**Model a proč:** `qwen3-vl:32b-instruct`:
+**Model a proč:** hlavní model `qwen3-vl:235b-a22b-instruct`:
+- je největší z modelů, které prošly testy, takže dává nejkvalitnější extrakci a hodnocení,
 - umí vision (sken nebo fotka CV),
-- varianta *instruct* negeneruje dlouhé „thinking“ bloky, takže je rychlejší,
-- dobře zvládá JSON a function calling (podložte výsledkem `test_models.py`).
+- varianta *instruct* negeneruje dlouhé „thinking“ bloky,
+- daní je rychlost: function calling trval 33 s, celá analýza tak trvá déle.
 
-Jako záložní model slouží `ministral-3-8b`: prošel všemi testy a je nejrychlejší (7,4 s). Záloha se spouští hlavně při přetížení serveru, kdy by velký model 235b nejspíš neodpověděl taky.
+Jako záložní model slouží `qwen3-vl:32b-instruct`: stejná rodina modelů, prošel všemi testy a je 3× rychlejší (9,5 s). Záloha se spustí, když hlavní model neodpoví (timeout, přetížení serveru). U velkého modelu je to pravděpodobnější, takže rychlejší záloha dává smysl.
 
 Výsledky `test_models.py` (10. 11. 2026, jeden běh na model):
 
 | Model | Function calling | JSON mód | Vision | Verdikt |
 |---|---|---|---|---|
-| qwen3-vl:32b-instruct | ✅ 9,5 s | ✅ | ✅ | **hlavní** |
-| ministral-3-8b | ✅ 7,4 s | ✅ | ✅ | **záložní** |
-| qwen3-vl:235b-a22b-instruct | ✅ 33 s | ✅ | ✅ | vhodný, pomalý |
+| qwen3-vl:235b-a22b-instruct | ✅ 33 s | ✅ | ✅ | **hlavní** |
+| qwen3-vl:32b-instruct | ✅ 9,5 s | ✅ | ✅ | **záložní** |
+| ministral-3-8b | ✅ 7,4 s | ✅ | ✅ | vhodný, nejrychlejší |
 | gemma-4-12b-it | ✅ 23 s | ✅ | ✅ | vhodný, pomalejší |
 | Qwen3.8-27B | ✅ 19 s | ✅ | ❌ | nevhodný |
 | Qwen3.6-35B-A3B | ✅ 7,2 s | ❌ | ❌ | nevhodný |
