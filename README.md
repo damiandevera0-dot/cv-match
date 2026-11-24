@@ -31,6 +31,7 @@ Výběr modelu podložíte daty tak, že spustíte `python test_models.py`. Skri
 | `cv_parser.py` | PDF → text (rozdělení 2 sloupců LinkedIn), sken/fotka → obrázky pro vision |
 | `job_fetcher.py` | URL inzerátu → text (JSON-LD JobPosting / HTML), srozumitelné chyby |
 | `lang.py` | rozpoznání jazyka (čeština/angličtina) heuristikou, bez volání modelu |
+| `pricing.py` | aktuální ceny komerčních API (OpenRouter Models API, záložně LiteLLM cost map) |
 | `test_models.py` | srovnání modelů na školním serveru |
 
 ### Jazyk úprav CV
@@ -75,7 +76,7 @@ Jako záložní model slouží `qwen3-vl:235b-a22b-instruct`. **Školní server 
 4. Záložka **🔍 Průběh**: počet pokusů, případná oprava nevalidního JSONu a přepnutí na záložní model.
 
 **Reflexe:**
-- **Cena:** jedno spuštění odpovídá 4 voláním modelu. Tokeny ukazuje záložka Průběh. Zadáte-li ceník komerčního API, aplikace spočítá cenu za běh. Na školním serveru je to 0 Kč.
+- **Cena:** jedno spuštění odpovídá 4 voláním modelu. Tokeny ukazuje záložka Průběh práce modelu a podle aktuálních ceníků (OpenRouter API) tam aplikace spočítá, kolik by běh stál u OpenAI, Anthropic nebo Google. Na školním serveru je to 0 Kč.
 - **Co chybí k produkci:**
   - autentizace uživatelů,
   - vlastní (nesdílený) klíč a limity,

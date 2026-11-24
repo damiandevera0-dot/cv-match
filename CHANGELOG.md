@@ -11,6 +11,19 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.4.0] – 2026-11-24
+### Přidáno
+- Aktuální ceny komerčních API v záložce „Průběh práce modelu“: aplikace stáhne ceníky
+  OpenAI, Anthropic a Google z veřejného OpenRouter Models API (záložně z cenové mapy
+  LiteLLM na GitHubu) a spočítá, kolik by stálo aktuální sezení a 1 000 takových sezení.
+- Výběr referenčních modelů (výchozí: dva nejnovější od každého poskytovatele),
+  zdroj a čas stažení pod tabulkou, tlačítko „Aktualizovat ceny“.
+- Ceník se ukládá do mezipaměti na 24 hodin; nový modul `pricing.py`.
+
+### Změněno
+- Ruční zadání ceny je teď v rozbalovacím poli a slouží jako záloha, když ceníky
+  nejdou stáhnout (např. bez internetu).
+
 ## [0.3.2] – 2026-11-24
 ### Změněno
 - Záložka Úpravy CV je rozdělená do dvou oddílů: „Jazyk a klíčová slova“
@@ -55,7 +68,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.2...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.1...v0.3.0

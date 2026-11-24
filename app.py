@@ -17,6 +17,7 @@ from cv_parser import CvParseError, parse_upload
 from job_fetcher import JobFetchError, fetch_job
 from llm import LLMClient, LLMError
 from version import __version__
+from pricing import PROVIDERS, PriceList, PricingError, cost_usd, default_selection, fetch_prices
 
 from models_catalog import CATALOG, DEFAULT_FALLBACK, DEFAULT_MODEL, default_suitable, split_models
 SAMPLE_JOB_PATH = os.path.join(os.path.dirname(__file__), "samples", "inzerat_ukazka.txt")
@@ -56,6 +57,8 @@ ss.setdefault("job_mode", MODE_URL)
 # Streamlit maže stav widgetů, které se v daném běhu nevykreslí (skryté pole URL/textu).
 # Znovupřiřazení stav zachová, takže se po přepnutí zdroje text ani odkaz neztratí.
 ss.job_text, ss.job_url = ss.job_text, ss.job_url
+if "price_models" in ss:  # výběr modelů v ceníku přežije přepnutí sekce
+    ss.price_models = ss.price_models
 
 
 def make_llm(model: str, fallback: str | None) -> LLMClient:
@@ -243,6 +246,71 @@ def run_pipeline() -> None:
 with st.container():
     if run:
         run_pipeline()
+
+
+# ================================================================== ceny komerčních API
+@st.cache_data(ttl=24 * 3600, show_spinner="Stahuji aktuální ceníky…")
+def load_prices() -> tuple[dict, list[str]]:
+    """Ceník se stahuje nejvýš jednou za 24 h (mezipaměť Streamlitu)."""
+    prices, warns = fetch_prices()
+    return prices.to_dict(), warns
+
+
+def render_costs(tin: int, tout: int) -> None:
+    st.markdown("##### 💵 Kolik by to stálo u komerčního API?")
+    st.caption("Školní server je pro vás zdarma. Pro srovnání aplikace stáhne aktuální ceníky "
+               "OpenAI, Anthropic a Google a spočítá cenu tokenů z tohoto sezení.")
+
+    prices = None
+    # Po neúspěchu nezkoušíme stahovat při každém kliknutí (timeouty by aplikaci zpomalily),
+    # ale až po stisku "Aktualizovat ceny".
+    if not ss.get("prices_error"):
+        try:
+            data, warns = load_prices()
+            prices = PriceList.from_dict(data)
+            for w in warns:
+                st.caption(f"⚠️ Primární zdroj nebyl dostupný ({w}), použit záložní.")
+        except PricingError as e:
+            ss.prices_error = str(e)
+    if ss.get("prices_error"):
+        st.warning(f"{ss.prices_error} Bez připojení k internetu zadejte cenu ručně níže.")
+
+    if prices:
+        by_id = {m.model_id: m for m in prices.models}
+        options = sorted(by_id, key=lambda i: (list(PROVIDERS).index(by_id[i].provider), by_id[i].name))
+        if "price_models" not in ss or not set(ss.price_models) <= set(by_id):
+            ss.price_models = [i for i in default_selection(prices) if i in by_id]
+        chosen = st.multiselect(
+            "Referenční modely", options, key="price_models",
+            format_func=lambda i: f"{PROVIDERS[by_id[i].provider]} · {by_id[i].name}",
+            placeholder="Vyberte modely ke srovnání…",
+            help="Výchozí výběr: dva nejnovější modely každého poskytovatele.")
+        if chosen:
+            rows = []
+            for i in chosen:
+                m = by_id[i]
+                session = cost_usd(m, tin, tout)
+                rows.append({
+                    "Model": m.name, "Poskytovatel": PROVIDERS[m.provider],
+                    "Vstup $/1M": round(m.input_per_m, 3), "Výstup $/1M": round(m.output_per_m, 3),
+                    "Toto sezení ($)": round(session, 4), "1 000 sezení ($)": round(session * 1000, 2),
+                })
+            st.dataframe(pd.DataFrame(rows).sort_values("Toto sezení ($)"),
+                         use_container_width=True, hide_index=True)
+        st.caption(f"Zdroj: [{prices.source}]({prices.source_url}) · staženo {prices.fetched_at}. "
+                   "Ceny jsou sazby poskytovatelů v USD bez DPH, slev za cache a dávkové zpracování.")
+
+    c1, c2 = st.columns([1, 3])
+    if c1.button("🔄 Aktualizovat ceny"):
+        load_prices.clear()
+        ss.prices_error = None
+        st.rerun()
+
+    with st.expander("Zadat cenu ručně", expanded=prices is None):
+        k1, k2, k3 = st.columns(3)
+        p_in = k1.number_input("Cena vstup (USD) / 1M", min_value=0.0, value=0.0, step=0.05)
+        p_out = k2.number_input("Cena výstup (USD) / 1M", min_value=0.0, value=0.0, step=0.1)
+        k3.metric("Odhad ceny", f"${(tin * p_in + tout * p_out) / 1e6:.4f}")
 
 
 # ================================================================== výsledky
@@ -440,7 +508,7 @@ if view == V_PROF:
 
 # ------------------------------------------------------------------ průběh / náklady
 if view == V_LOG:
-    st.markdown("Každé volání modelu: kterou roli hrál, jak dlouho trvalo, kolik spotřeboval tokenů "
+    st.caption("Každé volání modelu: kterou roli hrál, jak dlouho trvalo, kolik spotřeboval tokenů "
                 "a zda bylo potřeba opakování nebo záložní model.")
     if ss.logs:
         df = pd.DataFrame([{
@@ -455,10 +523,4 @@ if view == V_LOG:
         c2.metric("Výstupní tokeny", f"{tout:,}".replace(",", " "))
         c3.metric("Celkový čas", f"{df['Čas [s]'].sum():.0f} s")
 
-        st.markdown("##### Kolik by to stálo u komerčního API?")
-        st.caption("Školní server je pro vás zdarma. Pro reflexi doplňte aktuální ceník zvoleného poskytovatele "
-                   "(USD za 1 milion tokenů).")
-        k1, k2, k3 = st.columns(3)
-        p_in = k1.number_input("Cena vstup (USD) / 1M", min_value=0.0, value=0.0, step=0.05)
-        p_out = k2.number_input("Cena výstup (USD) / 1M", min_value=0.0, value=0.0, step=0.1)
-        k3.metric("Odhad ceny", f"${(tin * p_in + tout * p_out) / 1e6:.4f}")
+        render_costs(tin, tout)
