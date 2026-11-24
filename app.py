@@ -18,8 +18,7 @@ from job_fetcher import JobFetchError, fetch_job
 from llm import LLMClient, LLMError
 from version import __version__
 
-DEFAULT_MODEL = "qwen3-vl:32b-instruct"
-DEFAULT_FALLBACK = "ministral-3-8b"
+from models_catalog import CATALOG, DEFAULT_FALLBACK, DEFAULT_MODEL, default_suitable, split_models
 SAMPLE_JOB_PATH = os.path.join(os.path.dirname(__file__), "samples", "inzerat_ukazka.txt")
 
 st.set_page_config(page_title="CV Match", page_icon="🎯", layout="wide")
@@ -73,17 +72,37 @@ with st.sidebar:
     if st.button("Otestovat připojení", use_container_width=True):
         try:
             ss.models = LLMClient(BASE_URL, API_KEY, DEFAULT_MODEL).list_models()
-            st.success(f"Připojeno · {len(ss.models)} modelů")
         except LLMError as e:
             st.error(e.user_message)
 
-    options = ss.models or [DEFAULT_MODEL, DEFAULT_FALLBACK]
+    # --- filtr modelů: ze serveru nabízíme jen ty, které prošly testy (models_catalog.py)
+    if ss.models is not None:
+        suitable, others = split_models(ss.models)
+        st.success(f"Připojeno · na serveru {len(ss.models)} modelů, vhodných {len(suitable)}")
+        if not suitable:
+            st.warning("Žádný z otestovaných modelů teď na serveru není. Zobrazuji všechny.")
+    else:
+        suitable, others = default_suitable(), []
+        st.caption("Otestujte připojení, aby se nabídly jen modely, které na serveru opravdu jsou.")
+
+    show_all = st.toggle("Zobrazit i nevhodné modely", value=not suitable, disabled=not others,
+                         help="Modely, které neprošly testy, nebo nebyly otestované. Jen pro experimenty.")
+    options = suitable + (others if show_all else [])
+
     model = st.selectbox("Hlavní model", options,
                          index=options.index(DEFAULT_MODEL) if DEFAULT_MODEL in options else 0,
                          help="Musí umět function calling. Pro CV jako obrázek musí umět i vision.")
-    fallback = st.selectbox("Záložní model (při výpadku)", ["— žádný —"] + options,
-                            index=(options.index(DEFAULT_FALLBACK) + 1) if DEFAULT_FALLBACK in options else 0)
+    fb_options = ["— žádný —"] + [m for m in options if m != model]
+    fallback = st.selectbox("Záložní model (při výpadku)", fb_options,
+                            index=fb_options.index(DEFAULT_FALLBACK) if DEFAULT_FALLBACK in fb_options else 0)
     fallback = None if fallback.startswith("—") else fallback
+
+    with st.expander("Proč jen tyto modely?"):
+        st.caption("Aplikace potřebuje strukturovaný výstup (function calling) a čtení obrázků (vision). "
+                   "Hodnocení vychází z `test_models.py`.")
+        rows = [f"- **{name}** · {i.badge}  \n  {i.reason}" for name, i in CATALOG.items()
+                if ss.models is None or name in ss.models]
+        st.markdown("\n".join(rows))
     want_edits = st.toggle("Navrhnout úpravy CV", value=True, help="Jedno LLM volání navíc.")
 
     st.divider()
