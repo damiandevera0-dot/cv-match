@@ -16,6 +16,7 @@ from lang import LANG_FLAG, LANG_NAME
 from cv_parser import CvParseError, parse_upload
 from job_fetcher import JobFetchError, fetch_job
 from llm import LLMClient, LLMError
+from version import __version__
 
 DEFAULT_MODEL = "qwen3-vl:32b-instruct"
 DEFAULT_FALLBACK = "ministral-3-8b"
@@ -86,7 +87,7 @@ with st.sidebar:
     want_edits = st.toggle("Navrhnout úpravy CV", value=True, help="Jedno LLM volání navíc.")
 
     st.divider()
-    st.caption(f"Server: `{BASE_URL}`")
+    st.caption(f"CV Match v{__version__} · Server: `{BASE_URL}`")
     st.caption("Data CV zůstávají na školním serveru VŠE – nic se neposílá komerčním poskytovatelům.")
     if ss.result and st.button("🔄 Nová analýza", use_container_width=True):
         ss.result, ss.chat = None, []
