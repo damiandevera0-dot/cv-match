@@ -20,7 +20,7 @@ from version import __version__
 from pricing import PRICE_VENDORS, PriceList, PricingError, cost_usd, default_selection, fetch_prices
 
 from config import read_setting
-from providers import PROVIDERS, normalize_model_ids, pick_default
+from providers import PROVIDERS, is_paid, normalize_model_ids, pick_default
 from model_tests import is_chat_model, load_results, rank, run_batch, save_results
 SAMPLE_JOB_PATH = os.path.join(os.path.dirname(__file__), "samples", "inzerat_ukazka.txt")
 
@@ -79,7 +79,8 @@ def render_model_tests(all_models: list[str], tested: dict) -> None:
     with st.expander(f"🧪 Test modelů ({len(done)}/{len(chat_models)} otestováno)", expanded=not done):
         st.caption(f"Poskytovatel nabízí {len(all_models)} modelů, z toho {len(chat_models)} chatovacích "
                    "(embedding, obrázkové, audio a podobné modely se netestují). Každý model = nejvýš "
-                   "2 krátká volání: u placených zlomky centu, u bezplatných se počítají do denního limitu.")
+                   "2 krátká volání. U placených modelů je to zlomek centu za model, ale u desítek "
+                   "či stovek modelů se to sčítá; u bezplatných se volání počítají do denního limitu.")
         untested = [m for m in chat_models if m not in tested]
         pending = [m for m in chat_models if m not in tested or tested[m].tier == 3]
         labels = {"next": f"Dalších N neotestovaných ({len(untested)} zbývá)",
@@ -101,6 +102,15 @@ def render_model_tests(all_models: list[str], tested: dict) -> None:
             todo = chat_models
         else:
             todo = st.multiselect("Modely", chat_models, key=f"test_pick_{pid}")
+        # placené modely: testovat jen po výslovném souhlasu (stojí reálné peníze)
+        paid = [m for m in (todo or []) if is_paid(prov, m)]
+        if paid:
+            st.warning(f"{len(paid)} z {len(todo)} vybraných modelů je **placených** – test stojí reálné "
+                       "peníze. Bez nabitého kreditu může zůstatek spadnout do mínusu a poskytovatel "
+                       "(např. OpenRouter) pak může blokovat i bezplatné modely.")
+            if not st.checkbox("Rozumím, chci otestovat i placené modely", key=f"test_paid_ok_{pid}"):
+                todo = [m for m in todo if not is_paid(prov, m)]
+                st.caption(f"Placené modely se přeskočí – otestuje se {len(todo)} bezplatných.")
         workers = prov.test_workers
         if todo:
             est = -(-len(todo) // workers) * 15  # hrubý odhad: ~15 s na model, paralelně
@@ -142,6 +152,8 @@ with st.sidebar:
     pid = st.selectbox("Poskytovatel modelů", list(PROVIDERS), key="provider",
                        format_func=lambda p: PROVIDERS[p].name)
     prov = PROVIDERS[pid]
+    if prov.warning:
+        st.warning(prov.warning, icon="⚠️")
     if prov.url_editable:
         ss.setdefault(f"url_{pid}", prov.base_url)
         base_url = st.text_input("Adresa serveru", key=f"url_{pid}",
@@ -178,7 +190,7 @@ with st.sidebar:
     if models_list:
         base_opts = models_list
         if pid == "openrouter" and any(m.endswith(":free") for m in base_opts):
-            if st.toggle("Jen bezplatné modely (:free)", key="or_free_only",
+            if st.toggle("Jen bezplatné modely (:free)", key="or_free_only", value=True,
                          help="Bez nákupu kreditů fungují jen modely s příponou :free (s denním limitem)."):
                 base_opts = [m for m in base_opts if m.endswith(":free")]
         # z tabulky výsledků testu: nabídnout vhodné modely, nejrychlejší první
@@ -216,6 +228,9 @@ with st.sidebar:
         fb = st.selectbox("Záložní model (při výpadku)", fb_options,
                           index=fb_options.index(default_fb) if default_fb in fb_options else 0)
         fallback = None if fb.startswith("—") else fb
+        if is_paid(prov, model) or (fallback and is_paid(prov, fallback)):
+            st.caption("💳 Vybraný model je placený – každá analýza i zpráva v chatu stojí kredit "
+                       "u poskytovatele.")
 
     if models_list:
         render_model_tests(base_opts, tested)

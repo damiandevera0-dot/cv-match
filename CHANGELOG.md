@@ -11,6 +11,22 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.9.1] – 2026-11-24
+### Opraveno
+- Test modelů mohl bez upozornění volat placené modely (na OpenRouteru tak test bez kreditu
+  utratil cca 0,12 $ a zůstatek spadl do mínusu). Placené modely se teď v testu přeskočí,
+  dokud uživatel nezaškrtne „Rozumím, chci otestovat i placené modely“; aplikace ukáže,
+  kolik z vybraných modelů je placených.
+- `test_models.py` placené modely přeskakuje; testovat je jde jen s `--include-paid`.
+
+### Změněno
+- OpenRouter: přepínač „Jen bezplatné modely (:free)“ je zapnutý jako výchozí.
+- U vybraného placeného modelu se zobrazí upozornění, že každá analýza i zpráva v chatu stojí kredit.
+- Popisek testu už neslibuje jen „zlomky centu“ – upozorňuje, že u desítek modelů se cena sčítá.
+- Ollama je označená jako **netestovaná**: lokální hosting nebyl při vývoji otestován na skutečné
+  instalaci a funkčnost se nezaručuje (upozornění v aplikaci, v `test_models.py` i v kódu).
+- Poskytovatelé mají v `providers.py` údaj o placení (`billing`) a funkci `is_paid()`.
+
 ## [0.9.0] – 2026-11-24
 ### Přidáno
 - Test modelů po dávkách: volba „Dalších N neotestovaných“ otestuje prvních N modelů,
@@ -171,7 +187,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.0...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.0...v0.7.1

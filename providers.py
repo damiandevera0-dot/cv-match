@@ -24,6 +24,9 @@ class Provider:
     privacy: str = ""                 # kam odchází data CV
     key_setting: str = ""             # nepovinný název klíče v secrets.toml / proměnné prostředí
     test_workers: int = 3             # kolik modelů testovat najednou (ohled na limity)
+    billing: str = "paid"             # "paid" = každé volání stojí peníze, "mixed" = jen některé modely
+                                      # (OpenRouter: placené vs. :free), "free" = zdarma
+    warning: str = ""                 # upozornění zobrazené po výběru poskytovatele
     # Výchozí model: první vzor, kterému odpovídá nějaký model z nabídky (bere se nejnovější verze).
     preferred: tuple[str, ...] = field(default_factory=tuple)
 
@@ -34,6 +37,7 @@ PROVIDERS: dict[str, Provider] = {
         base_url="https://openrouter.ai/api/v1",
         key_url="https://openrouter.ai/settings/keys", key_placeholder="sk-or-…",
         key_setting="OPENROUTER_API_KEY", test_workers=2,  # bezplatné modely: 20 požadavků/min
+        billing="mixed",
         privacy="CV se posílá přes OpenRouter vybranému poskytovateli modelu.",
         preferred=(r"^google/gemini-[\d.]+-flash$", r"^openai/gpt-[\d.]+-mini$", r"^qwen/qwen[\d.]*-vl"),
     ),
@@ -50,18 +54,32 @@ PROVIDERS: dict[str, Provider] = {
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         key_url="https://aistudio.google.com/apikey", key_placeholder="AIza…",
         key_setting="GEMINI_API_KEY", test_workers=2,  # bezplatná vrstva má nízké limity
+        billing="free",  # bezplatná vrstva (bez propojeného účtu pro platby)
         privacy="CV se posílá společnosti Google.",
         preferred=(r"^gemini-[\d.]+-flash$", r"^gemini-[\d.]+-pro$"),
     ),
+    # POZOR: lokální hosting (Ollama) nebyl při vývoji otestován na skutečné instalaci –
+    # implementace vychází z dokumentace OpenAI-kompatibilního API Ollamy. Funkčnost se nezaručuje.
     "ollama": Provider(
-        id="ollama", name="Ollama (lokálně)",
+        id="ollama", name="Ollama (lokálně, netestováno)",
         base_url="http://localhost:11434/v1",
         needs_key=False, url_editable=True, test_workers=1,  # lokální modely se načítají postupně
         connection_hint="Běží Ollama? Spusťte ji (aplikace Ollama nebo `ollama serve`) a zkontrolujte adresu.",
         privacy="CV zůstává ve vašem počítači – nic se neposílá ven.",
         preferred=(r"qwen[\d.]*-?vl", r"gemma\d", r"llava", r"vision"),
+        billing="free",
+        warning="Lokální hosting (Ollama) nebyl při vývoji otestován – funkčnost se nezaručuje. "
+                "Potřebujete nainstalovanou Ollamu a stažený model s podporou obrázků a nástrojů.",
     ),
 }
+
+
+def is_paid(provider: Provider, model_id: str) -> bool:
+    """Stojí volání modelu peníze? U OpenRouteru jsou zdarma jen modely s příponou :free
+    (modely s nulovou cenou bez přípony bereme pro jistotu jako placené)."""
+    if provider.billing == "mixed":
+        return not model_id.endswith(":free")
+    return provider.billing == "paid"
 
 
 def _version_key(model_id: str) -> tuple:

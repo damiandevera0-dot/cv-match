@@ -24,7 +24,7 @@ import sys
 from config import read_setting
 from llm import LLMClient, LLMError
 from model_tests import is_chat_model, load_results, run_batch, save_results
-from providers import PROVIDERS, normalize_model_ids
+from providers import PROVIDERS, is_paid, normalize_model_ids
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -36,6 +36,8 @@ def main() -> None:
     ap.add_argument("--all", action="store_true", help="otestovat všechny chatovací modely serveru")
     ap.add_argument("--limit", type=int, help="otestovat prvních N dosud NEOTESTOVANÝCH chatovacích modelů")
     ap.add_argument("--free-only", action="store_true", help="OpenRouter: jen modely :free")
+    ap.add_argument("--include-paid", action="store_true",
+                    help="testovat i placené modely (stojí reálné peníze; bez tohoto přepínače se přeskočí)")
     ap.add_argument("--key", help="API klíč (jinak secrets.toml / proměnná prostředí)")
     ap.add_argument("--base-url", help="vlastní adresa serveru (např. Ollama na jiném počítači)")
     ap.add_argument("--workers", type=int, help="kolik modelů testovat najednou (výchozí podle poskytovatele)")
@@ -69,6 +71,18 @@ def main() -> None:
         else:
             sys.exit("Zadejte modely přes --models, dávku přes --limit N, nebo všechny přes --all.\n"
                      f"Server nabízí {len(available)} modelů, např.: {', '.join(available[:8])}")
+
+    if prov.warning:
+        print(f"UPOZORNĚNÍ: {prov.warning}\n")
+
+    # placené modely jen s výslovným souhlasem (--include-paid)
+    paid = [m for m in models if is_paid(prov, m)]
+    if paid and not args.include_paid:
+        models = [m for m in models if not is_paid(prov, m)]
+        print(f"Přeskakuji {len(paid)} placených modelů (test by stál peníze). "
+              "Pokud je chcete testovat, přidejte --include-paid.")
+        if not models:
+            sys.exit("Nezbyl žádný bezplatný model k otestování.")
 
     workers = args.workers or prov.test_workers
     print(f"Poskytovatel: {prov.name} · modelů k otestování: {len(models)} · najednou: {workers}\n")
