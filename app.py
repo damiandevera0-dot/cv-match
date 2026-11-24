@@ -389,7 +389,7 @@ def load_prices() -> tuple[dict, list[str]]:
 
 def render_costs(tin: int, tout: int) -> None:
     st.markdown("##### 💵 Kolik by to stálo u komerčního API?")
-    st.caption("Školní server je pro vás zdarma. Pro srovnání aplikace stáhne aktuální ceníky "
+    st.caption("Bezplatné modely a lokální Ollama nestojí nic. Pro srovnání aplikace stáhne aktuální ceníky "
                "OpenAI, Anthropic a Google a spočítá cenu tokenů z tohoto sezení.")
 
     prices = None

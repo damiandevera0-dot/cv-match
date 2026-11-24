@@ -61,6 +61,11 @@ def main() -> None:
             sys.exit(f"CHYBA: {e.user_message}")
         if args.free_only:
             available = [m for m in available if m.endswith(":free")]
+        if not args.include_paid:  # placené vyřadit ještě před --limit, ať dávka obsahuje N bezplatných
+            free = [m for m in available if not is_paid(prov, m)]
+            if len(free) < len(available):
+                print(f"Přeskakuji {len(available) - len(free)} placených modelů (přidejte --include-paid).")
+            available = free
         if args.limit:
             done = load_results(args.provider)
             models = [m for m in available if is_chat_model(m) and m not in done][:args.limit]
@@ -71,6 +76,9 @@ def main() -> None:
         else:
             sys.exit("Zadejte modely přes --models, dávku přes --limit N, nebo všechny přes --all.\n"
                      f"Server nabízí {len(available)} modelů, např.: {', '.join(available[:8])}")
+
+    if not models:
+        sys.exit("Žádný model k otestování (placené modely testujte s --include-paid).")
 
     if prov.warning:
         print(f"UPOZORNĚNÍ: {prov.warning}\n")

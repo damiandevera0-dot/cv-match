@@ -45,7 +45,7 @@ STATUS_ICON = {"ok": "✅", "partial": "⚠️", "fail": "❌", "busy": "⏳", "
 # Modely, které zjevně negenerují text z obrázku/textu → netestujeme (ušetří čas i limity).
 NON_CHAT = re.compile(
     r"embed|imagen|veo|tts|audio|live|image-generation|-image|transcribe|whisper|dall-e|"
-    r"moderation|realtime|computer-use|lyria|robotics|aqa|rerank|guard|banana", re.IGNORECASE)
+    r"moderation|realtime|computer-use|lyria|robotics|aqa|rerank|guard|banana|:batch\b", re.IGNORECASE)
 
 
 def is_chat_model(model_id: str) -> bool:
@@ -143,10 +143,17 @@ def _is_fatal(e: LLMError) -> bool:
 def _classify(e: LLMError) -> tuple[str, str]:
     """Rozliší, PROČ model neodpověděl: (stav, poznámka s HTTP kódem)."""
     code, detail = e.status, (e.detail or "").lower()
+    if code == 404 and "image input" in detail:
+        return "fail", "obrázky nepodporuje (HTTP 404)"
     if code == 404 or "not found" in detail:
         return "na", "model neexistuje / byl vypnut (HTTP 404)"
+    if code == 402 and "in-flight" in detail:
+        return "busy", "souběžné požadavky přesáhly kredit (HTTP 402)"
     if code == 402:
         return "na", "vyžaduje kredit (HTTP 402)"
+    if code == 429 and re.search(r"no credits|insufficient_quota|exceeded your current quota|credits remaining",
+                                 detail):
+        return "na", "chybí kredit (HTTP 429)"
     if code == 403:
         return "na", "bez přístupu (HTTP 403)"
     if code == 429 and re.search(r"limit:\s*0\b", detail):

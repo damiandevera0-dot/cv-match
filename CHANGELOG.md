@@ -11,6 +11,22 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.9.2] – 2026-11-24
+### Přidáno
+- Nové README pro portfolio v angličtině (`README.md`) a češtině (`README.cs.md`).
+- Licence MIT (`LICENSE`).
+
+### Opraveno
+- Test modelů: modely na OpenRouteru, které neumí nástroje (HTTP 404 „No endpoints found that
+  support tool use“), se teď otestují v JSON módu místo označení „neexistuje“; 404 „… support
+  image input“ znamená „obrázky nepodporuje“, ne „model neexistuje“.
+- Test modelů: OpenAI 429 „no credits remaining“ se hlásí jako „🚫 chybí kredit“ (dřív
+  „⏳ zkusit znovu“); OpenRouter 402 kvůli souběžným požadavkům jako „⏳ zkusit znovu“.
+- Varianty `:batch` (nejdou volat přes chat API) se netestují.
+- `test_models.py`: placené modely se vyřadí ještě před `--limit`, takže dávka obsahuje
+  N bezplatných modelů; když nezbude žádný model, skript skončí srozumitelnou hláškou.
+- Text v sekci nákladů už nezmiňuje školní server.
+
 ## [0.9.1] – 2026-11-24
 ### Opraveno
 - Test modelů mohl bez upozornění volat placené modely (na OpenRouteru tak test bez kreditu
@@ -187,7 +203,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.1...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.1...v0.8.0

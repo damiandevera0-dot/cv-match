@@ -1,112 +1,130 @@
 # 🎯 CV Match
 
-Semestrální práce 4IZ233 Generativní AI, téma 2: středně složitá aplikace.
+**Compare your CV with a job posting using LLMs – see how well you fit, what to change in your CV, and get help from an AI career coach.**
 
-Webová aplikace (Streamlit), která porovná **CV z LinkedIn** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem. Funguje s modely od OpenRouteru, OpenAI, Google Gemini, s lokální Ollamou i se školním serverem VŠE.
+> 🇨🇿 Česká verze: [README.cs.md](README.cs.md)
 
-> Verze odevzdaná k obhajobě (jen školní server VŠE) je ve větvi `vse-fis-school`.
+CV Match is a Streamlit web app. You upload a CV (a LinkedIn PDF export, any other PDF, a scan or a photo) and a job posting (a link or pasted text). The app extracts structured data from both, evaluates every requirement of the position against the CV, computes a match score and suggests concrete CV edits in the right language. A built-in career coach then helps with a cover letter or with explaining gaps.
 
-## Spuštění
+It works with **OpenRouter, OpenAI, Google Gemini** and (untested) **local Ollama** – you paste an API key directly into the app; it is kept only in the session memory and never stored.
+
+> The user interface and prompts are in **Czech**. CVs and job postings can be in Czech or English.
+
+---
+
+## Features
+
+| | |
+|---|---|
+| 📄 **CV input** | LinkedIn PDF (the two-column layout is split correctly), any text PDF, scanned PDF or photo (read by a vision model) |
+| 💼 **Job posting** | URL (job portals via JSON-LD `JobPosting`, otherwise the main page content) or pasted text; clear fallback when a site blocks downloading (e.g. LinkedIn) |
+| 📊 **Match score** | Every requirement is rated *met / partial / missing* with evidence from the CV. The score is computed **in Python** (must-have ×3, nice-to-have ×1), so it is reproducible and explainable |
+| ✍️ **CV edits** | Concrete rewrites (original → improved → why) and missing keywords. Language rules: explicit requirement in the posting > language of the posting > language of the CV |
+| 💬 **Career coach** | Multi-turn chat with memory and full context of the analysis (cover letter, how to explain gaps, what to learn) |
+| 🔍 **Run log & costs** | Every LLM call with tokens, time, retries and fallbacks, plus a live cost comparison for OpenAI / Anthropic / Google models (prices from the OpenRouter Models API, fallback: LiteLLM cost map) |
+| 🧪 **Model testing** | Batch test of all models of a provider – structured output, vision and speed; results are saved and the app offers only suitable models |
+
+## How it works
+
+```
+CV (PDF / image) ──► parser ──► [Extractor CV] ─────┐
+                                                    ├──► [Recruiter] ──► score (Python) ──► [Career coach]
+Job (URL / text) ──► fetcher ─► [Extractor job] ────┘                                       CV edits + chat
+```
+
+Four LLM roles, each with its own prompt. All structured steps use **function calling with JSON Schemas generated from Pydantic models**, and the output is validated:
+
+- **Self-correction** – when the output does not match the schema (or misses a requirement), the validation error is sent back to the model, which fixes it (up to 3 attempts).
+- **JSON mode fallback** – when a provider or model does not support tools.
+- **Parameter adaptation** – e.g. newer OpenAI models reject `max_tokens` or a custom `temperature`; the app detects this from the error message, adapts and remembers it.
+- **Retries and a fallback model** – 429 / 5xx / timeouts are retried and the request can switch to a backup model.
+- **User-friendly errors** – no stack traces; for example “Is Ollama running?” or “The site blocked downloading, paste the text instead.”
+
+## Model providers
+
+| Provider | API key | Notes |
+|---|---|---|
+| OpenRouter | [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) | One key for models of many vendors. **“Free models only (:free)” is on by default.** Free models have a daily request limit. |
+| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | Paid |
+| Google Gemini | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Free tier with limits (often busy) |
+| Ollama (local) | not needed | ⚠️ **Not tested on a real installation – no guarantee it works.** Needs Ollama and a model with vision + tool support. CV data never leaves your computer. |
+
+All providers expose an OpenAI-compatible API, so the app uses a single client (`openai` Python SDK) – only the URL and key differ.
+
+**Paid-model protection:** paid models (all OpenAI models, OpenRouter models without `:free`) are marked in the UI and skipped by the model test unless you explicitly confirm it.
+
+## Model testing and the results table
+
+Providers offer dozens to hundreds of models (Gemini ~50, OpenRouter ~400), and it is not known in advance which of them can do function calling and read images. The app can test them:
+
+- **In the app:** sidebar → **🧪 Test modelů** → *next N untested* / *untested and retry* / *all* / *selected*. Models are tested in parallel; embedding, image-generation and audio models are skipped.
+- **From the terminal:**
+
+  ```bash
+  python test_models.py --provider gemini --all
+  python test_models.py --provider openrouter --limit 50 --free-only
+  python test_models.py --provider openai --models <model-name> --include-paid
+  ```
+
+Both use the same test (`model_tests.py`, at most 2 short calls per model) and write to the same table, **`model_catalogs/<provider>.json`**. The app then offers only suitable models and preselects the fastest one.
+
+| Verdict | Meaning |
+|---|---|
+| ✅ suitable | function calling (or JSON mode) **and** vision work |
+| ⚠️ text PDFs only | structured output works, images do not |
+| ⏳ retry | temporary error (rate limit 429, 5xx, timeout) – retested next time |
+| 🚫 unavailable for account | model does not exist for the key, needs credit or is not in the free tier |
+| ❌ unsuitable | no valid structured output |
+
+The tables in this repository are snapshots from the author's accounts; availability changes over time. The test checks format support and speed, **not the quality** of the CV evaluation.
+
+## Getting started
+
+Requires **Python 3.9+**.
 
 ```bash
+git clone https://github.com/damiandevera0-dot/cv-match.git
+cd cv-match
 python -m venv .venv
-.venv\Scripts\activate          # Windows  (macOS/Linux: source .venv/bin/activate)
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-V postranním panelu aplikace zvolte poskytovatele, vložte API klíč a klikněte na **Připojit a načíst modely**. Klíč se drží jen v paměti relace prohlížeče a nikam se neukládá. Potřebujete Python 3.9+.
+In the sidebar choose a provider, paste your API key and click **Připojit a načíst modely** (connect). The key lives only in the session memory.
 
-## Poskytovatelé modelů
+Optionally, for local development you can put keys into `.streamlit/secrets.toml` (see `.streamlit/secrets.toml.example`; the file is git-ignored).
 
-| Poskytovatel | API klíč | Poznámka |
-|---|---|---|
-| OpenRouter | [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) | jeden klíč pro modely mnoha firem, i bezplatné (s denním limitem) |
-| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | placené |
-| Google Gemini | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | bezplatná vrstva s limity |
-| Ollama (lokálně) | není potřeba | zdarma, CV neopustí počítač; potřebuje nainstalovanou Ollamu a vision model |
-| VŠE (školní server) | z Moodlu kurzu | jen ve školní síti nebo přes VPN |
+## Project structure
 
-Všichni poskytovatelé mají OpenAI-kompatibilní API, takže aplikace používá jednu knihovnu (`openai`) a liší se jen adresa a klíč. Pokud server nepodporuje některý parametr (např. `max_tokens` u novějších modelů OpenAI), aplikace ho podle chybové hlášky sama upraví.
-
-Pro pohodlí při vývoji jde klíč uložit i do `.streamlit/secrets.toml` (viz `secrets.toml.example`) – pole na stránce pak může zůstat prázdné.
-
-### Test modelů a tabulka výsledků
-
-Komerční poskytovatelé mají desítky modelů (Gemini kolem 50) a předem není jasné, které zvládají function calling a čtení obrázků. Aplikace je proto umí otestovat hromadně:
-
-- **V aplikaci:** po připojení v postranním panelu **🧪 Test modelů** → „Neotestované“ / „Všechny chatovací“ / „Vybrané“. Modely se testují paralelně (u Gemini 4 najednou), embedding, obrázkové a audio modely se přeskočí.
-- **Z terminálu:** `python test_models.py --provider gemini --all` (dále `--models …`, `--free-only` pro OpenRouter, `--out soubor.csv`).
-
-Oba způsoby používají stejný test (`model_tests.py`) a ukládají výsledky do stejné tabulky **`model_catalogs/<poskytovatel>.json`**. Z ní aplikace bere, které modely nabídnout (jen vhodné) a který předvybrat (nejrychlejší vhodný), podobně jako FIS verze z ručního katalogu `models_catalog.py`. Modely, které neodpověděly kvůli dočasné chybě (**⏳ zkusit znovu**: limit 429, přetížení 5xx), se při dalším testu „Neotestované a nedostupné“ zkusí znovu. Modely **🚫 nedostupné pro účet** (pro váš klíč neexistují nebo nejsou v bezplatné vrstvě) se znovu netestují.
-
-Tabulka neobsahuje žádné klíče, takže ji můžete commitnout do gitu. Kdo si projekt stáhne, uvidí rovnou otestované modely.
-
-## Struktura
-
-| Soubor | Co dělá |
+| File | Purpose |
 |---|---|
-| `app.py` | UI: vstupy, průběh analýzy, 6 záložek s výsledky |
-| `ui_components.py` | HTML/CSS komponenty (skórový kruh, štítky, karty, časová osa) |
-| `analysis.py` | pipeline: 4 LLM role + výpočet skóre v Pythonu |
-| `llm.py` | klient LiteLLM: function calling, validace, opravy, retry, záložní model, log volání |
-| `schemas.py` | Pydantic schémata = JSON Schema pro function calling + validátor |
-| `cv_parser.py` | PDF → text (rozdělení 2 sloupců LinkedIn), sken/fotka → obrázky pro vision |
-| `job_fetcher.py` | URL inzerátu → text (JSON-LD JobPosting / HTML), srozumitelné chyby |
-| `lang.py` | rozpoznání jazyka (čeština/angličtina) heuristikou, bez volání modelu |
-| `pricing.py` | aktuální ceny komerčních API (OpenRouter Models API, záložně LiteLLM cost map) |
-| `providers.py` | poskytovatelé modelů (adresa, klíč, výchozí model, poznámka o soukromí) |
-| `model_tests.py` | test modelů (paralelní), ukládání a řazení výsledků v `model_catalogs/` |
-| `test_models.py` | hromadný test modelů z terminálu (libovolný poskytovatel), stejný test jako v aplikaci |
+| `app.py` | Streamlit UI: inputs, analysis progress, results sections, sidebar |
+| `ui_components.py` | HTML/CSS components (score ring, chips, cards, timeline) |
+| `analysis.py` | Pipeline: 4 LLM roles, score computation, language decision |
+| `llm.py` | LLM client: function calling, validation & self-correction, JSON mode, retries, fallback model, call log |
+| `schemas.py` | Pydantic schemas = JSON Schema for function calling + validator |
+| `cv_parser.py` | PDF → text (LinkedIn two-column split), scans/photos → images for vision |
+| `job_fetcher.py` | Job URL → text (JSON-LD / HTML) with clear errors |
+| `lang.py` | Czech/English detection (heuristic, no LLM call) |
+| `providers.py` | Model providers: URL, key, default model, billing, privacy note |
+| `model_tests.py` | Model test (parallel), saving and ranking results in `model_catalogs/` |
+| `test_models.py` | Batch model test from the terminal |
+| `pricing.py` | Live API prices (OpenRouter Models API, fallback LiteLLM cost map) |
+| `config.py` | Optional settings from `secrets.toml` / environment variables |
+| `version.py`, `CHANGELOG.md` | Version and change history ([Semantic Versioning](https://semver.org/)) |
 
-### Jazyk úprav CV
+## Privacy and limitations
 
-Aplikace určí jazyk inzerátu a CV a podle pravidel zvolí, v jakém jazyce navrhovat úpravy:
+- The CV is sent to the selected provider (except Ollama). The app itself stores neither the CV nor the API key. Free tiers of some providers may use requests to improve their products – check the provider's terms before uploading someone else's CV.
+- The match score is a transparent heuristic, not a validated hiring metric.
+- Job pages rendered by JavaScript cannot be downloaded – paste the text instead.
+- Local hosting (Ollama) has not been tested.
 
-> výslovný požadavek inzerátu („send your CV in English“) > jazyk inzerátu > jazyk CV > čeština
+## Background
 
-- Pokud se CV a cílový jazyk liší, návrhy rovnou přeloží a aplikace na rozdíl upozorní.
-- Jazyk návrhů se po vygenerování kontroluje. Když model odpoví ve špatném jazyce, dostane chybu a odpověď přepíše.
-- Uživatel může jazyk ručně přepnout.
-- Kouč píše texty pro zaměstnavatele (motivační dopis) v cílovém jazyce.
+The project started as a semester project for the course **4IZ233 Generative AI** at the Prague University of Economics and Business (VŠE). The version submitted for the defense, running on the university's own LLM server, is kept in the [`vse-fis-school`](https://github.com/damiandevera0-dot/cv-match/tree/vse-fis-school) branch. The `main` branch continues as a provider-independent version.
 
-## Jak aplikace plní zadání (požadováno 2 ze 4, splněny všechny 4)
+## License
 
-| Požadavek | Kde |
-|---|---|
-| **Strukturovaný výstup / function calling** | Každý krok analýzy volá „nástroj“ `submit_…` s JSON Schema z Pydanticu. Výstup se validuje. Při chybě se modelu pošle chybová hláška a model odpověď opraví (až 3 pokusy). Když server nástroje nepodporuje, aplikace přepne na JSON mód. |
-| **Vícekolový dialog + více LLM rolí** | Role: *Extraktor CV*, *Extraktor inzerátu*, *Recruiter*, *Kariérní kouč*. Chat s koučem má paměť (posledních 14 zpráv + kontext analýzy). |
-| **Propojení s dalším datovým zdrojem** | Parsing PDF, stažení inzerátu z webu (JSON-LD / HTML), **výpočet skóre v Pythonu** (vážený součet: povinné ×3, výhodou ×1). Skóre tak nepočítá model, takže je reprodukovatelné. |
-| **Multimodalita** | PDF, a navíc **sken nebo fotka CV**. PDF bez textové vrstvy se vykreslí na obrázky a přečte ho vision model `qwen3-vl`. |
-
-## Osnova obhajoby
-
-**Uživatel a problém:** student nebo absolvent, který hledá práci. Dnes ručně čte inzerát, odškrtává si v hlavě, co splňuje, a CV upravuje pro každou pozici zvlášť. Recruiteři dělají opačný proces (screening CV), takže aplikaci může použít i recruiter.
-
-**Proč tento stack:** Streamlit, protože celé UI je v Pythonu a zadání klade důraz na použitelnost, ne na technologii. Knihovna `openai` funguje se školním serverem (OpenAI-kompatibilní API) a stejný kód poběží i s komerčním API.
-
-**Model a proč:** `qwen3-vl:32b-instruct`:
-- umí vision (sken nebo fotka CV),
-- varianta *instruct* negeneruje dlouhé „thinking“ bloky, takže je rychlejší,
-- dobře zvládá JSON a function calling (podložte výsledkem `test_models.py`).
-
-Jako záložní model slouží `qwen3-vl:235b-a22b-instruct`. **Školní server = CV (osobní údaje) neodchází ke komerčnímu poskytovateli**, což je argument z pohledu GDPR.
-
-**Demo na nových datech:** CV spolužáka nebo kamaráda (LinkedIn → Uložit jako PDF) a inzerát, který jste při vývoji nepoužili.
-
-**Ukázka chyb, které stojí za to předvést:**
-1. Odkaz na LinkedIn inzerát: aplikace vysvětlí, proč ho nejde stáhnout, a nabídne vložení textu.
-2. Nahraný sken nebo fotka CV: aplikace automaticky přepne na vision model.
-3. Odpojení VPN: aplikace zobrazí hlášku „Jste ve školní síti / VPN?“ místo pádu.
-4. Záložka **🔍 Průběh**: počet pokusů, případná oprava nevalidního JSONu a přepnutí na záložní model.
-
-**Reflexe:**
-- **Cena:** jedno spuštění odpovídá 4 voláním modelu. Tokeny ukazuje záložka Průběh práce modelu a podle aktuálních ceníků (OpenRouter API) tam aplikace spočítá, kolik by běh stál u OpenAI, Anthropic nebo Google. Na školním serveru je to 0 Kč.
-- **Co chybí k produkci:**
-  - autentizace uživatelů,
-  - vlastní (nesdílený) klíč a limity,
-  - fronta požadavků místo synchronního čekání,
-  - ukládání historie analýz,
-  - evaluační sada (CV × inzerát s ručním hodnocením) pro měření kvality skóre,
-  - prohlášení o zpracování osobních údajů a mazání dat,
-  - stahování inzerátů renderovaných JavaScriptem (headless prohlížeč).
+[MIT](LICENSE) © 2026 Damián Devera

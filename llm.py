@@ -284,6 +284,14 @@ class LLMClient:
                     method = "json_mode"
                     continue
                 raise LLMError("Server odmítl požadavek (možná je vstup příliš dlouhý).", str(e))
+            except LLMError as e:
+                # OpenRouter vrací 404 "No endpoints found that support tool use", když model
+                # nástroje neumí → stejně jako u odmítnutých tools zkusíme JSON mód
+                if method == "function_calling" and e.status == 404 and "tool" in (e.detail or "").lower():
+                    log.notes.append("model nepodporuje tools → JSON mód")
+                    method = "json_mode"
+                    continue
+                raise
 
             self._add_usage(log, resp)
             msg = resp.choices[0].message
