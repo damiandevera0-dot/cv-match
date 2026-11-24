@@ -2,6 +2,9 @@
 
 Semestrální práce 4IZ233 Generativní AI, téma 2: středně složitá aplikace.
 
+> **Větev `vse-fis-school` = verze odevzdaná k obhajobě (v1.0.0).** Běží nad školním LLM serverem
+> VŠE a vyžaduje školní síť nebo VPN. Další vývoj (verze nezávislá na školním serveru) probíhá ve větvi `main`.
+
 Webová aplikace (Streamlit), která porovná **CV** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem. Běží nad školním LLM serverem `litellm.vse.cz`.
 
 ## Spuštění
@@ -23,7 +26,7 @@ Výběr modelu podložíte daty tak, že spustíte `python test_models.py`. Skri
 
 | Soubor | Co dělá |
 |---|---|
-| `app.py` | UI: vstupy, průběh analýzy, 6 záložek s výsledky |
+| `app.py` | UI: vstupy, průběh analýzy, 6 sekcí s výsledky |
 | `ui_components.py` | HTML/CSS komponenty (skórový kruh, štítky, karty, časová osa) |
 | `analysis.py` | pipeline: 4 LLM role + výpočet skóre v Pythonu |
 | `llm.py` | klient LiteLLM: function calling, validace, opravy, retry, záložní model, log volání |
@@ -32,7 +35,9 @@ Výběr modelu podložíte daty tak, že spustíte `python test_models.py`. Skri
 | `job_fetcher.py` | URL inzerátu → text (JSON-LD JobPosting / HTML), srozumitelné chyby |
 | `lang.py` | rozpoznání jazyka (čeština/angličtina) heuristikou, bez volání modelu |
 | `pricing.py` | aktuální ceny komerčních API (OpenRouter Models API, záložně LiteLLM cost map) |
+| `models_catalog.py` | katalog modelů školního serveru s hodnocením, filtr vhodných modelů |
 | `test_models.py` | srovnání modelů na školním serveru |
+| `version.py`, `CHANGELOG.md` | číslo verze a historie změn |
 
 ### Jazyk úprav CV
 
@@ -65,15 +70,30 @@ Aplikace určí jazyk inzerátu a CV a podle pravidel zvolí, v jakém jazyce na
 - varianta *instruct* negeneruje dlouhé „thinking“ bloky, takže je rychlejší,
 - dobře zvládá JSON a function calling (podložte výsledkem `test_models.py`).
 
-Jako záložní model slouží `qwen3-vl:235b-a22b-instruct`. **Školní server = CV (osobní údaje) neodchází ke komerčnímu poskytovateli**, což je argument z pohledu GDPR.
+Jako záložní model slouží `ministral-3-8b`: prošel všemi testy a je nejrychlejší (7,4 s). Záloha se spouští hlavně při přetížení serveru, kdy by velký model 235b nejspíš neodpověděl taky.
+
+Výsledky `test_models.py` (10. 11. 2026, jeden běh na model):
+
+| Model | Function calling | JSON mód | Vision | Verdikt |
+|---|---|---|---|---|
+| qwen3-vl:32b-instruct | ✅ 9,5 s | ✅ | ✅ | **hlavní** |
+| ministral-3-8b | ✅ 7,4 s | ✅ | ✅ | **záložní** |
+| qwen3-vl:235b-a22b-instruct | ✅ 33 s | ✅ | ✅ | vhodný, pomalý |
+| gemma-4-12b-it | ✅ 23 s | ✅ | ✅ | vhodný, pomalejší |
+| Qwen3.8-27B | ✅ 19 s | ✅ | ❌ | nevhodný |
+| Qwen3.6-35B-A3B | ✅ 7,2 s | ❌ | ❌ | nevhodný |
+| ornith:35b | ⚠️ 121 s, 2. pokus | ✅ | ✅ | nespolehlivý |
+
+Aplikace po připojení nabízí jen vhodné modely (`models_catalog.py`); zdůvodnění je v postranním panelu v „Proč jen tyto modely?“. Test ověřuje dodržení formátu a rychlost, ne kvalitu hodnocení. **Školní server = CV (osobní údaje) neodchází ke komerčnímu poskytovateli**, což je argument z pohledu GDPR.
 
 **Demo na nových datech:** CV spolužáka nebo kamaráda (LinkedIn → Uložit jako PDF) a inzerát, který jste při vývoji nepoužili.
 
 **Ukázka chyb, které stojí za to předvést:**
 1. Odkaz na LinkedIn inzerát: aplikace vysvětlí, proč ho nejde stáhnout, a nabídne vložení textu.
-2. Nahraný sken nebo fotka CV: aplikace automaticky přepne na vision model.
+2. Nahraný sken nebo fotka CV: PDF bez textové vrstvy aplikace pozná a pošle ho modelu jako obrázky.
 3. Odpojení VPN: aplikace zobrazí hlášku „Jste ve školní síti / VPN?“ místo pádu.
-4. Záložka **🔍 Průběh**: počet pokusů, případná oprava nevalidního JSONu a přepnutí na záložní model.
+4. Sekce **🔍 Průběh práce modelu**: počet pokusů, případná oprava nevalidního JSONu a přepnutí na záložní model.
+5. Ceny komerčních API: když OpenRouter neodpoví, aplikace použije záložní ceník LiteLLM, a když selže i ten, nabídne ruční zadání.
 
 **Reflexe:**
 - **Cena:** jedno spuštění odpovídá 4 voláním modelu. Tokeny ukazuje záložka Průběh práce modelu a podle aktuálních ceníků (OpenRouter API) tam aplikace spočítá, kolik by běh stál u OpenAI, Anthropic nebo Google. Na školním serveru je to 0 Kč.

@@ -9,7 +9,17 @@ verze se řídí [Semantic Versioning](https://semver.org/lang/cs/):
 
 Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k obhajobě.
 
+**Tato větev (`vse-fis-school`)** obsahuje verzi pro obhajobu. Její tagy mají předponu `vse-`
+(`vse-v1.0.0`, `vse-v1.0.1`…), aby se nepletly s verzemi ve větvi `main`.
+
 ## [Nevydáno]
+
+## [1.0.0] – 2026-11-24
+Verze pro obhajobu semestrální práce. Funkčně odpovídá 0.4.0.
+
+### Změněno
+- README: popis větve, výsledky testu modelů, aktualizovaný záložní model (`ministral-3-8b`)
+  a scénáře ošetření chyb pro obhajobu.
 
 ## [0.4.0] – 2026-11-24
 ### Přidáno
@@ -68,7 +78,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/vse-v1.0.0...vse-fis-school
+[1.0.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...vse-v1.0.0
 [0.4.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.0...v0.3.1
