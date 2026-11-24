@@ -311,46 +311,59 @@ if view == V_REQ:
 
 # ------------------------------------------------------------------ úpravy CV
 if view == V_EDIT:
-    # --- jazyk úprav: automatické rozhodnutí + možnost přepnout
-    lc1, lc2 = st.columns([3, 2], gap="large")
-    with lc1:
-        how = "ručně zvoleno" if lang.manual else lang.reason
-        ui.card("🌐 Jazyk úprav CV",
-                f"<b>{LANG_FLAG[lang.target]} {LANG_NAME[lang.target]}</b>"
-                f"<div class='muted'>{ui.escape(how)}</div>")
+    # ======== Sekce 1: nastavení úprav – jazyk, přegenerování, klíčová slova
+    st.markdown("#### 🌐 Jazyk a klíčová slova")
+    with st.container(border=True):
+        lc1, lc2 = st.columns([3, 2], gap="large", vertical_alignment="center")
+        with lc1:
+            how = "ručně zvoleno" if lang.manual else lang.reason
+            ui.html(f"<div class='muted'>Jazyk úprav CV</div>"
+                    f"<div style='font-size:1.15rem;font-weight:700'>{LANG_FLAG[lang.target]} "
+                    f"{LANG_NAME[lang.target]}</div><div class='muted'>{ui.escape(how)}</div>")
+        with lc2:
+            other = "en" if lang.target == "cs" else "cs"
+            if st.button(f"Přegenerovat v jazyce {LANG_FLAG[other]} {LANG_NAME[other]}",
+                         use_container_width=True):
+                with st.spinner("Kariérní kouč přepisuje návrhy…"):
+                    try:
+                        new_edits = suggest_edits(make_llm(model, fallback), R["cv"], profile, job,
+                                                  analysis, other, lang.cv)
+                        lang.target, lang.manual = other, True
+                        R["edits"] = new_edits
+                        st.rerun()
+                    except LLMError as e:
+                        st.error(e.user_message)
         if lang.mismatch:
             st.warning(f"Vaše CV je v jazyce **{LANG_NAME[lang.cv]}**, ale pro tuto pozici doporučuji "
                        f"**{LANG_NAME[lang.target]}**. Návrhy níže jsou rovnou přeložené – zvažte "
                        f"připravit celou verzi CV v tomto jazyce.")
-    with lc2:
-        other = "en" if lang.target == "cs" else "cs"
-        st.write("")
-        if st.button(f"Přegenerovat v jazyce {LANG_FLAG[other]} {LANG_NAME[other]}", use_container_width=True):
-            with st.spinner("Kariérní kouč přepisuje návrhy…"):
-                try:
-                    new_edits = suggest_edits(make_llm(model, fallback), R["cv"], profile, job,
-                                              analysis, other, lang.cv)
-                    lang.target, lang.manual = other, True
-                    R["edits"] = new_edits
-                    st.rerun()
-                except LLMError as e:
-                    st.error(e.user_message)
 
-    if not edits:
-        st.info("Návrhy úprav nejsou k dispozici (vypnuto v nastavení nebo selhalo generování).")
-    else:
-        if edits.keywords_to_add:
-            ui.card("🔑 Klíčová slova z inzerátu, která v CV chybí", ui.chips(edits.keywords_to_add))
-        md = [f"# Návrhy úprav CV – {job.title} ({LANG_NAME[lang.target]})\n"]
-        for e in edits.edits:
-            body = (f'<div class="old">{ui.escape(e.original)}</div>' if e.original else "")
-            body += f'<div class="new">{ui.escape(e.improved)}</div>'
-            body += f'<div class="muted" style="margin-top:.4rem">💡 {ui.escape(e.reason)}</div>'
-            ui.card(e.section, body)
-            md.append(f"## {e.section}\n" + (f"~~{e.original}~~\n\n" if e.original else "")
-                      + f"{e.improved}\n\n_{e.reason}_\n")
-        st.download_button("⬇️ Stáhnout návrhy (Markdown)", "\n".join(md),
-                           file_name="navrhy_uprav_cv.md", mime="text/markdown")
+        st.divider()
+        ui.html("<div class='muted' style='margin-bottom:.4rem'>🔑 Klíčová slova z inzerátu, "
+                "která v CV chybí</div>")
+        if edits and edits.keywords_to_add:
+            ui.html(ui.chips(edits.keywords_to_add))
+        else:
+            ui.html("<div class='muted'>—</div>")
+
+    # ======== Sekce 2: samotné návrhy přepisů
+    st.markdown(f"#### ✍️ Navrhované přepisy" + (f" ({len(edits.edits)})" if edits else ""))
+    with st.container(border=True):
+        if not edits:
+            st.info("Návrhy úprav nejsou k dispozici (vypnuto v nastavení nebo selhalo generování).")
+        else:
+            md = [f"# Návrhy úprav CV – {job.title} ({LANG_NAME[lang.target]})\n"]
+            if edits.keywords_to_add:
+                md.append("**Chybějící klíčová slova:** " + ", ".join(edits.keywords_to_add) + "\n")
+            for e in edits.edits:
+                body = (f'<div class="old">{ui.escape(e.original)}</div>' if e.original else "")
+                body += f'<div class="new">{ui.escape(e.improved)}</div>'
+                body += f'<div class="muted" style="margin-top:.4rem">💡 {ui.escape(e.reason)}</div>'
+                ui.card(e.section, body)
+                md.append(f"## {e.section}\n" + (f"~~{e.original}~~\n\n" if e.original else "")
+                          + f"{e.improved}\n\n_{e.reason}_\n")
+            st.download_button("⬇️ Stáhnout návrhy (Markdown)", "\n".join(md),
+                               file_name="navrhy_uprav_cv.md", mime="text/markdown")
 
 # ------------------------------------------------------------------ chat
 if view == V_CHAT:

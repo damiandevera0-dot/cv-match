@@ -11,6 +11,13 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.3.2] – 2026-11-24
+### Změněno
+- Záložka Úpravy CV je rozdělená do dvou oddílů: „Jazyk a klíčová slova“
+  (jazyk úprav, přegenerování do jiného jazyka, chybějící klíčová slova)
+  a „Navrhované přepisy“ (jednotlivé návrhy a stažení).
+- Stažený Markdown s návrhy obsahuje i chybějící klíčová slova.
+
 ## [0.3.1] – 2026-11-24
 ### Opraveno
 - Po kliknutí na rychlý dotaz v kariérním kouči se okno se záložkami zdvojilo
@@ -48,7 +55,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.0...v0.2.1
