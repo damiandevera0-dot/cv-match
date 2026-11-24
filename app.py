@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 import ui_components as ui
-from analysis import (PERSONAS, LangDecision, chat_system_prompt, compute_score, decide_language,
+from analysis import (LangDecision, chat_system_prompt, compute_score, decide_language,
                       evaluate, extract_job, extract_profile, suggest_edits)
 from lang import LANG_FLAG, LANG_NAME
 from cv_parser import CvParseError, parse_upload
@@ -44,7 +44,6 @@ ss = st.session_state
 ss.setdefault("logs", [])          # log všech LLM volání (sdílený napříč reruny)
 ss.setdefault("result", None)      # výsledek poslední analýzy
 ss.setdefault("chat", [])          # historie chatu
-ss.setdefault("persona", "Kariérní kouč")
 ss.setdefault("models", None)
 ss.setdefault("job_text", "")
 ss.setdefault("job_url", "")
@@ -97,7 +96,7 @@ with st.sidebar:
 # ================================================================== vstupy
 ui.hero("🎯 CV Match",
         "Nahrajte své CV z LinkedIn a pracovní inzerát. Zjistíte, jak dobře na pozici sedíte, "
-        "co upravit v CV a můžete si vyzkoušet pohovor.")
+        "co upravit v CV a kariérní kouč vám pomůže s přípravou.")
 
 
 def load_sample_job() -> None:
@@ -228,7 +227,7 @@ st.caption(f"Kandidát: **{profile.name or 'neuvedeno'}** · zdroj inzerátu: {R
            f"inzerát {lang_label(lang.posting)} · CV {lang_label(lang.cv)}")
 
 t_over, t_req, t_edit, t_chat, t_prof, t_log = st.tabs(
-    ["📊 Přehled", "✅ Požadavky", "✍️ Úpravy CV", "💬 Kouč & pohovor", "👤 Profil", "🔍 Průběh"])
+    ["📊 Přehled", "✅ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil", "🔍 Průběh"])
 
 # ------------------------------------------------------------------ přehled
 with t_over:
@@ -312,54 +311,40 @@ with t_edit:
 
 # ------------------------------------------------------------------ chat
 with t_chat:
-    persona = st.segmented_control("Režim", list(PERSONAS), default=ss.persona, label_visibility="collapsed")
-    if persona and persona != ss.persona:  # změna role = nová konverzace
-        ss.persona, ss.chat = persona, []
-        st.rerun()
-    st.caption("Kouč radí s CV a přípravou (texty pro zaměstnavatele píše v jazyce "
-               f"{LANG_NAME[lang.target]}) · Simulace pohovoru probíhá v jazyce inzerátu "
-               f"({LANG_NAME[lang.posting or lang.target]}). Konverzace si pamatuje kontext.")
+    st.caption("Kouč radí s CV, motivačním dopisem a přípravou na pozici. Texty pro zaměstnavatele píše "
+               f"v jazyce {LANG_NAME[lang.target]}. Konverzace si pamatuje kontext.")
 
     chat_box = st.container(height=460)
     for msg in ss.chat:
-        if msg.get("hidden"):
-            continue
         chat_box.chat_message(msg["role"], avatar="🧑" if msg["role"] == "user" else "🎯").write(msg["content"])
 
-    def respond(user_text: str, hidden: bool = False) -> None:
-        ss.chat.append({"role": "user", "content": user_text, "hidden": hidden})
-        if not hidden:
-            chat_box.chat_message("user", avatar="🧑").write(user_text)
-        system = chat_system_prompt(ss.persona, profile, job, analysis, score, lang)
+    def respond(user_text: str) -> None:
+        ss.chat.append({"role": "user", "content": user_text})
+        chat_box.chat_message("user", avatar="🧑").write(user_text)
+        system = chat_system_prompt(profile, job, analysis, score, lang)
         history = [{"role": m["role"], "content": m["content"]} for m in ss.chat[-14:]]  # paměť: posl. 14 zpráv
         llm = make_llm(model, fallback)
         with chat_box.chat_message("assistant", avatar="🎯"):
             try:
-                answer = st.write_stream(llm.chat_stream(ss.persona, [{"role": "system", "content": system}] + history))
+                answer = st.write_stream(llm.chat_stream("Kariérní kouč", [{"role": "system", "content": system}] + history))
                 ss.chat.append({"role": "assistant", "content": answer})
             except LLMError as e:
                 ss.chat.pop()  # neúspěšný dotaz z historie odeber
                 st.error(e.user_message)
 
     if not ss.chat:
-        if ss.persona == "Simulace pohovoru":
-            if st.button("▶️ Začít pohovor", type="primary"):
-                respond("Dobrý den, jsem připraven(a) na pohovor.", hidden=True)
+        q1, q2, q3 = st.columns(3)
+        gap = analysis.gaps[0] if analysis.gaps else "chybějící zkušenosti"
+        quick = {
+            q1: "Napiš mi krátký motivační dopis na tuto pozici.",
+            q2: f"Jak u pohovoru vysvětlit: {gap}?",
+            q3: "Co si mám doučit během jednoho měsíce, abych měl(a) větší šanci?",
+        }
+        for col, text in quick.items():
+            if col.button(text, use_container_width=True):
+                respond(text)
                 if ss.chat:
                     st.rerun()
-        else:
-            q1, q2, q3 = st.columns(3)
-            gap = analysis.gaps[0] if analysis.gaps else "chybějící zkušenosti"
-            quick = {
-                q1: "Napiš mi krátký motivační dopis na tuto pozici.",
-                q2: f"Jak u pohovoru vysvětlit: {gap}?",
-                q3: "Co si mám doučit během jednoho měsíce, abych měl(a) větší šanci?",
-            }
-            for col, text in quick.items():
-                if col.button(text, use_container_width=True):
-                    respond(text)
-                    if ss.chat:
-                        st.rerun()
 
     if prompt := st.chat_input("Napište zprávu…"):
         respond(prompt)

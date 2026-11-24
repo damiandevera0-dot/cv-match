@@ -52,23 +52,14 @@ JAZYK – důležité:
   * 'original' ponech přesně tak, jak je v CV (v původním jazyce).
   * 'section' a 'reason' piš česky (vysvětlení pro uživatele aplikace)."""
 
-PERSONAS = {
-    "Kariérní kouč": (
-        "Jsi přátelský, ale věcný kariérní kouč. Pomáháš kandidátovi připravit se na tuto "
-        "konkrétní pozici: radíš s úpravou CV, motivačním dopisem, jak vysvětlit mezery, "
-        "co si doplnit. S uživatelem mluv česky, stručně a konkrétně. Texty určené "
-        "zaměstnavateli (motivační dopis, formulace do CV, e-mail recruiterovi) ale piš "
-        "v jazyce: {target}, pokud si uživatel výslovně neřekne jinak. Opírej se o data "
-        "níže; když něco v datech není, řekni to."
-    ),
-    "Simulace pohovoru": (
-        "Jsi recruiter firmy z inzerátu a vedeš s kandidátem pracovní pohovor. Pohovor veď "
-        "v jazyce inzerátu: {posting}. Ptej se vždy JEN JEDNOU otázkou, zaměřuj se na "
-        "požadavky, kde má kandidát mezery. Po každé odpovědi dej krátkou zpětnou vazbu "
-        "(1–2 věty, co bylo dobré / co zlepšit) a polož další otázku. Začni krátkým "
-        "představením a první otázkou."
-    ),
-}
+PROMPT_COACH = (
+    "Jsi přátelský, ale věcný kariérní kouč. Pomáháš kandidátovi připravit se na tuto "
+    "konkrétní pozici: radíš s úpravou CV, motivačním dopisem, jak vysvětlit mezery, "
+    "co si doplnit. S uživatelem mluv česky, stručně a konkrétně. Texty určené "
+    "zaměstnavateli (motivační dopis, formulace do CV, e-mail recruiterovi) ale piš "
+    "v jazyce: {target}, pokud si uživatel výslovně neřekne jinak. Opírej se o data "
+    "níže; když něco v datech není, řekni to."
+)
 
 
 # ------------------------------------------------------------------ skóre
@@ -215,7 +206,7 @@ def suggest_edits(llm: LLMClient, cv: CvInput, profile: CandidateProfile,
                           check=right_language)
 
 
-def chat_system_prompt(persona: str, profile: CandidateProfile, job: JobRequirements,
+def chat_system_prompt(profile: CandidateProfile, job: JobRequirements,
                        analysis: MatchAnalysis, score: Score, lang: LangDecision) -> str:
     context = {
         "pozice": job.model_dump(exclude_none=True),
@@ -225,6 +216,4 @@ def chat_system_prompt(persona: str, profile: CandidateProfile, job: JobRequirem
             "silne_stranky": analysis.strengths, "mezery": analysis.gaps,
         },
     }
-    persona_prompt = PERSONAS[persona].format(
-        target=LANG_PROMPT[lang.target], posting=LANG_PROMPT[lang.posting or lang.target])
-    return persona_prompt + "\n\nDATA:\n" + json.dumps(context, ensure_ascii=False)
+    return PROMPT_COACH.format(target=LANG_PROMPT[lang.target]) + "\n\nDATA:\n" + json.dumps(context, ensure_ascii=False)

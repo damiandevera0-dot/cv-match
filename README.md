@@ -2,7 +2,7 @@
 
 Semestrální práce 4IZ233 Generativní AI, téma 2: středně složitá aplikace.
 
-Webová aplikace (Streamlit), která porovná **CV z LinkedIn** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem nebo simulaci pohovoru. Běží nad školním LLM serverem `litellm.vse.cz`.
+Webová aplikace (Streamlit), která porovná **CV z LinkedIn** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem. Běží nad školním LLM serverem `litellm.vse.cz`.
 
 ## Spuštění
 
@@ -43,14 +43,13 @@ Aplikace určí jazyk inzerátu a CV a podle pravidel zvolí, v jakém jazyce na
 - Jazyk návrhů se po vygenerování kontroluje. Když model odpoví ve špatném jazyce, dostane chybu a odpověď přepíše.
 - Uživatel může jazyk ručně přepnout.
 - Kouč píše texty pro zaměstnavatele (motivační dopis) v cílovém jazyce.
-- Simulace pohovoru probíhá v jazyce inzerátu.
 
 ## Jak aplikace plní zadání (požadováno 2 ze 4, splněny všechny 4)
 
 | Požadavek | Kde |
 |---|---|
 | **Strukturovaný výstup / function calling** | Každý krok analýzy volá „nástroj“ `submit_…` s JSON Schema z Pydanticu. Výstup se validuje. Při chybě se modelu pošle chybová hláška a model odpověď opraví (až 3 pokusy). Když server nástroje nepodporuje, aplikace přepne na JSON mód. |
-| **Vícekolový dialog + více LLM rolí** | Role: *Extraktor CV*, *Extraktor inzerátu*, *Recruiter*, *Kariérní kouč*. Chat má paměť (posledních 14 zpráv + kontext analýzy) a dva režimy: kouč a simulace pohovoru. |
+| **Vícekolový dialog + více LLM rolí** | Role: *Extraktor CV*, *Extraktor inzerátu*, *Recruiter*, *Kariérní kouč*. Chat s koučem má paměť (posledních 14 zpráv + kontext analýzy). |
 | **Propojení s dalším datovým zdrojem** | Parsing PDF, stažení inzerátu z webu (JSON-LD / HTML), **výpočet skóre v Pythonu** (vážený součet: povinné ×3, výhodou ×1). Skóre tak nepočítá model, takže je reprodukovatelné. |
 | **Multimodalita** | PDF, a navíc **sken nebo fotka CV**. PDF bez textové vrstvy se vykreslí na obrázky a přečte ho vision model `qwen3-vl`. |
 
