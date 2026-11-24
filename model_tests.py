@@ -145,6 +145,8 @@ def _classify(e: LLMError) -> tuple[str, str]:
     code, detail = e.status, (e.detail or "").lower()
     if code == 404 or "not found" in detail:
         return "na", "model neexistuje / byl vypnut (HTTP 404)"
+    if code == 402:
+        return "na", "vyžaduje kredit (HTTP 402)"
     if code == 403:
         return "na", "bez přístupu (HTTP 403)"
     if code == 429 and re.search(r"limit:\s*0\b", detail):

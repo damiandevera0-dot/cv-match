@@ -11,6 +11,19 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.9.0] – 2026-11-24
+### Přidáno
+- Test modelů po dávkách: volba „Dalších N neotestovaných“ otestuje prvních N modelů,
+  které ještě nemají výsledek (výchozí 50); další spuštění pokračuje dalšími. Hodí se
+  u poskytovatelů se stovkami modelů (OpenRouter ~400).
+- `test_models.py --limit N`: totéž z terminálu.
+- Chyba HTTP 402 (chybí kredit, např. placený model na OpenRouteru bez nabití) se hlásí
+  jako „🚫 nedostupný pro účet – vyžaduje kredit“.
+
+### Změněno
+- Při HTTP 402 a 403 se volání neopakuje (opakování nepomůže).
+- Volby testu mají stabilní klíče, takže se výběr neztratí, když se po testu změní počty v popiscích.
+
 ## [0.8.0] – 2026-11-24
 Úklid: odstranění duplicit a školního serveru (ten má vlastní větev `vse-fis-school`).
 
@@ -158,7 +171,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.8.0...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.1...v0.7.0

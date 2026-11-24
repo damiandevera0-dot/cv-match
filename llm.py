@@ -200,6 +200,8 @@ class LLMClient:
                 except openai.APIStatusError as e:  # 5xx, typicky 504 Gateway Time-out
                     last_exc = e
                     log.notes.append(f"{model}: HTTP {e.status_code}")
+                    if e.status_code in (402, 403):  # chybí kredit / přístup → opakování nepomůže
+                        break
                     if attempt == 0:
                         self.on_event(f"Model {model} neodpověděl (HTTP {e.status_code}), zkouším znovu…")
                         time.sleep(3)

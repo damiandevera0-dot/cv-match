@@ -80,13 +80,26 @@ def render_model_tests(all_models: list[str], tested: dict) -> None:
         st.caption(f"Poskytovatel nabízí {len(all_models)} modelů, z toho {len(chat_models)} chatovacích "
                    "(embedding, obrázkové, audio a podobné modely se netestují). Každý model = nejvýš "
                    "2 krátká volání: u placených zlomky centu, u bezplatných se počítají do denního limitu.")
+        untested = [m for m in chat_models if m not in tested]
         pending = [m for m in chat_models if m not in tested or tested[m].tier == 3]
-        scopes = {f"Neotestované a nedostupné ({len(pending)})": pending,
-                  f"Všechny chatovací ({len(chat_models)})": chat_models,
-                  "Vybrané…": None}
-        scope = st.radio("Co otestovat", list(scopes), key=f"test_scope_{pid}")
-        todo = scopes[scope]
-        if todo is None:
+        labels = {"next": f"Dalších N neotestovaných ({len(untested)} zbývá)",
+                  "pending": f"Neotestované a „zkusit znovu“ ({len(pending)})",
+                  "all": f"Všechny chatovací ({len(chat_models)})",
+                  "pick": "Vybrané…"}
+        # stabilní klíče možností – popisky s počty se po testu mění
+        scope = st.radio("Co otestovat", list(labels), format_func=labels.get, key=f"test_scope_{pid}")
+        if scope == "next":
+            n = st.number_input("Kolik modelů", min_value=1, max_value=max(1, len(untested)),
+                                value=min(50, max(1, len(untested))), step=10, key=f"test_n_{pid}",
+                                disabled=not untested,
+                                help="Otestuje prvních N modelů, které ještě nemají žádný výsledek "
+                                     "(v pořadí podle názvu). Další spuštění pokračuje dalšími.")
+            todo = untested[:int(n)]
+        elif scope == "pending":
+            todo = pending
+        elif scope == "all":
+            todo = chat_models
+        else:
             todo = st.multiselect("Modely", chat_models, key=f"test_pick_{pid}")
         workers = prov.test_workers
         if todo:

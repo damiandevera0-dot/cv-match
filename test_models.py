@@ -6,6 +6,7 @@ ze které aplikace bere, které modely nabídnout. Volitelně i do CSV (--out).
 
 Příklady:
     python test_models.py --provider gemini --all          # všechny chatovací modely Gemini
+    python test_models.py --provider openrouter --limit 50 # dalších 50 dosud neotestovaných
     python test_models.py --provider gemini --models gemini-3.8-flash gemini-3.8-pro
     python test_models.py --provider openrouter --all --free-only
     python test_models.py --provider ollama --all
@@ -22,7 +23,7 @@ import sys
 
 from config import read_setting
 from llm import LLMClient, LLMError
-from model_tests import STATUS_ICON, is_chat_model, run_batch, save_results
+from model_tests import is_chat_model, load_results, run_batch, save_results
 from providers import PROVIDERS, normalize_model_ids
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,6 +34,7 @@ def main() -> None:
     ap.add_argument("--provider", choices=list(PROVIDERS), required=True)
     ap.add_argument("--models", nargs="*", help="názvy modelů k otestování")
     ap.add_argument("--all", action="store_true", help="otestovat všechny chatovací modely serveru")
+    ap.add_argument("--limit", type=int, help="otestovat prvních N dosud NEOTESTOVANÝCH chatovacích modelů")
     ap.add_argument("--free-only", action="store_true", help="OpenRouter: jen modely :free")
     ap.add_argument("--key", help="API klíč (jinak secrets.toml / proměnná prostředí)")
     ap.add_argument("--base-url", help="vlastní adresa serveru (např. Ollama na jiném počítači)")
@@ -57,18 +59,24 @@ def main() -> None:
             sys.exit(f"CHYBA: {e.user_message}")
         if args.free_only:
             available = [m for m in available if m.endswith(":free")]
-        if args.all:
+        if args.limit:
+            done = load_results(args.provider)
+            models = [m for m in available if is_chat_model(m) and m not in done][:args.limit]
+            if not models:
+                sys.exit("Všechny chatovací modely už mají výsledek v tabulce.")
+        elif args.all:
             models = [m for m in available if is_chat_model(m)]
         else:
-            sys.exit("Zadejte modely přes --models, nebo otestujte všechny přes --all.\n"
+            sys.exit("Zadejte modely přes --models, dávku přes --limit N, nebo všechny přes --all.\n"
                      f"Server nabízí {len(available)} modelů, např.: {', '.join(available[:8])}")
 
     workers = args.workers or prov.test_workers
     print(f"Poskytovatel: {prov.name} · modelů k otestování: {len(models)} · najednou: {workers}\n")
 
     def on_result(i: int, n: int, r) -> None:
-        print(f"[{i}/{n}] {r.model}: {r.verdict[0]}  (struktura {STATUS_ICON[r.structured]} "
-              f"{r.structured_note}; vision {STATUS_ICON[r.vision]} {r.vision_note}; {r.total_s:.1f} s)")
+        row = r.as_row()
+        print(f"[{i}/{n}] {r.model}: {r.verdict[0]}  (struktura {row['Strukturovaný výstup']}; "
+              f"vision {row['Vision']}; {r.total_s:.1f} s)")
 
     results, fatal = run_batch(base_url, key, models, connection_hint=prov.connection_hint,
                                workers=workers, on_result=on_result)
