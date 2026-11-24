@@ -21,6 +21,7 @@ from pricing import PROVIDERS, PriceList, PricingError, cost_usd, default_select
 
 from models_catalog import CATALOG, DEFAULT_FALLBACK, DEFAULT_MODEL, default_suitable, split_models
 from providers import PROVIDERS as LLM_PROVIDERS, normalize_model_ids, pick_default
+from model_tests import STATUS_ICON, run_model_test
 SAMPLE_JOB_PATH = os.path.join(os.path.dirname(__file__), "samples", "inzerat_ukazka.txt")
 
 st.set_page_config(page_title="CV Match", page_icon="🎯", layout="wide")
@@ -38,16 +39,13 @@ def setting(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
 
-# Nepovinné: klíč může být i v .streamlit/secrets.toml / proměnné prostředí (pohodlí při vývoji).
-# Běžně ho uživatel zadá přímo na stránce a drží se jen v paměti relace.
-KEY_SETTING = {"openrouter": "OPENROUTER_API_KEY", "openai": "OPENAI_API_KEY",
-               "gemini": "GEMINI_API_KEY", "vse": "LITELLM_API_KEY"}
 
 ss = st.session_state
 ss.setdefault("logs", [])          # log všech LLM volání (sdílený napříč reruny)
 ss.setdefault("result", None)      # výsledek poslední analýzy
 ss.setdefault("chat", [])          # historie chatu
 ss.setdefault("models_by", {})     # načtené modely pro každého poskytovatele
+ss.setdefault("model_tests", {})   # výsledky testů modelů: (poskytovatel, model) → ModelTestResult
 ss.setdefault("job_text", "")
 ss.setdefault("job_url", "")
 NAV_VIEWS = ["📊 Přehled", "☑️ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil uchazeče",
@@ -75,6 +73,38 @@ def make_llm(model: str, fallback: str | None) -> LLMClient:
     return llm
 
 
+def render_model_tests(options: list[str], preselected: list[str]) -> None:
+    """Test vybraných modelů u aktuálního poskytovatele (strukturovaný výstup, vision, rychlost)."""
+    with st.expander("🧪 Otestovat modely"):
+        st.caption("Ověří, jestli model zvládá strukturovaný výstup a čtení obrázků. Jeden model = "
+                   "2 krátká volání API: u placených modelů zlomky centu, u bezplatných se počítají "
+                   "do denního limitu.")
+        to_test = st.multiselect("Modely k otestování", options, default=preselected, max_selections=5)
+        if st.button("Spustit test", disabled=not to_test, use_container_width=True):
+            bar = st.progress(0.0)
+            for i, m in enumerate(to_test):
+                bar.progress(i / len(to_test), text=f"Testuji {m}…")
+                try:
+                    ss.model_tests[(pid, m)] = run_model_test(
+                        base_url, api_key, m, user=(login or None) if prov.send_user else None,
+                        connection_hint=prov.connection_hint)
+                except LLMError as e:  # server nedostupný / špatný klíč → nemá smysl pokračovat
+                    st.error(e.user_message)
+                    break
+            bar.empty()
+        results = [ss.model_tests[(pid, m)] for m in options if (pid, m) in ss.model_tests]
+        if results:
+            for r in results:
+                st.markdown(f"**{r.model}** · {r.verdict[0]}  \n"
+                            f"<span style='font-size:.8rem;color:#6b7085'>struktura: "
+                            f"{STATUS_ICON[r.structured]} {r.structured_note} · vision: "
+                            f"{STATUS_ICON[r.vision]} {r.vision_note} · "
+                            f"{r.structured_s + r.vision_s:.0f} s</span>", unsafe_allow_html=True)
+            csv = pd.DataFrame([r.as_row() for r in results]).to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Výsledky (CSV)", csv, file_name=f"test_modelu_{pid}.csv",
+                               mime="text/csv", use_container_width=True)
+
+
 # ================================================================== sidebar
 with st.sidebar:
     st.markdown("### ⚙️ Nastavení")
@@ -95,8 +125,9 @@ with st.sidebar:
         api_key = st.text_input(
             "API klíč", type="password", key=f"key_{pid}", placeholder=prov.key_placeholder,
             help="Klíč se drží jen v paměti této relace a nikam se neukládá. Po zavření stránky zmizí.")
-        if not api_key and setting(KEY_SETTING.get(pid, "")):
-            api_key = setting(KEY_SETTING[pid])
+        # nepovinné: klíč ze secrets.toml / proměnné prostředí (pohodlí při vývoji)
+        if not api_key and prov.key_setting and setting(prov.key_setting):
+            api_key = setting(prov.key_setting)
             st.caption("Použit klíč ze `secrets.toml` / proměnné prostředí.")
         elif prov.key_url:
             st.caption(f"Klíč získáte na [{prov.key_url.split('/')[2]}]({prov.key_url}).")
@@ -130,6 +161,10 @@ with st.sidebar:
     elif models_list:
         st.success(f"Připojeno · {len(models_list)} modelů")
         options = models_list
+        if pid == "openrouter" and any(m.endswith(":free") for m in options):
+            if st.toggle("Jen bezplatné modely (:free)", key="or_free_only",
+                         help="Bez nákupu kreditů fungují jen modely s příponou :free (s denním limitem)."):
+                options = [m for m in options if m.endswith(":free")]
         default_main, default_fb = pick_default(prov, options), None
     else:
         options = []
@@ -148,6 +183,14 @@ with st.sidebar:
         fb = st.selectbox("Záložní model (při výpadku)", fb_options,
                           index=fb_options.index(default_fb) if default_fb in fb_options else 0)
         fallback = None if fb.startswith("—") else fb
+
+        # výsledek testu zvoleného modelu (pokud proběhl)
+        tested = ss.model_tests.get((pid, model))
+        if tested:
+            label, why = tested.verdict
+            (st.warning if not label.startswith("✅") else st.caption)(f"Test modelu: {label} – {why}")
+
+        render_model_tests(options, [m for m in (model, fallback) if m])
 
     if pid == "vse":
         with st.expander("Proč jen tyto modely?"):
@@ -235,6 +278,10 @@ def run_pipeline() -> None:
             st.write(f"   ↳ {info}, {cv.pages} str.{extra}")
             for w in cv.warnings:
                 st.warning(w)
+            tested = ss.model_tests.get((pid, model))
+            if cv.images and tested and tested.vision != "ok":
+                st.warning(f"Model {model} v testu nepřečetl obrázek – sken / fotka CV nejspíš selže. "
+                           "Zvolte model s vision, nebo nahrajte textové PDF.")
 
             # 2) inzerát – podle zvoleného zdroje (odkaz / text)
             if job_text_input:

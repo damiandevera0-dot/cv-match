@@ -11,6 +11,28 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.6.1] – 2026-11-24
+### Změněno
+- Sjednocený test modelů: `test_models.py` je teď jen terminálová obálka nad stejnou funkcí
+  jako tlačítko v aplikaci (`model_tests.run_model_test`). Testovací logika je na jednom místě.
+- `test_models.py` umí libovolného poskytovatele (`--provider`), všechny modely serveru (`--all`),
+  bezplatné modely OpenRouteru (`--free-only`) a vlastní adresu (`--base-url`).
+- Název nepovinného klíče v `secrets.toml` je součástí definice poskytovatele (`providers.py`).
+
+### Odebráno
+- Samostatný test JSON módu v `test_models.py`; JSON mód se testuje automaticky jako
+  záloha, když model nezvládne function calling.
+
+## [0.6.0] – 2026-11-24
+### Přidáno
+- Test modelů přímo v aplikaci („🧪 Otestovat modely“ v postranním panelu): u vybraných modelů
+  (až 5) ověří strukturovaný výstup (function calling / JSON mód), čtení obrázků a rychlost.
+  Výsledek s verdiktem (vhodný / jen textová PDF / nevhodný) jde stáhnout jako CSV.
+- Verdikt testu se ukáže pod výběrem modelu; když model v testu nepřečetl obrázek
+  a uživatel nahraje sken nebo fotku CV, aplikace před analýzou upozorní.
+- OpenRouter: přepínač „Jen bezplatné modely (:free)“; výchozí model se vybere i mezi nimi.
+- Nový modul `model_tests.py`.
+
 ## [0.5.0] – 2026-11-24
 ### Přidáno
 - Výběr poskytovatele modelů: OpenRouter, OpenAI, Google Gemini, Ollama (lokálně) a školní server VŠE
@@ -84,7 +106,9 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.5.0...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...v0.3.2

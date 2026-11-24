@@ -1,137 +1,106 @@
-"""Porovnání modelů na školním serveru pro potřeby aplikace.
+"""Hromadný test modelů z terminálu.
 
-Pro každý model otestuje:
-  1. function calling – vrátí validní JobRequirements z ukázkového inzerátu?
-  2. JSON mód        – totéž bez nástrojů
-  3. vision          – přečte text z obrázku?
-  4. rychlost        – čas odpovědi
+Používá STEJNÝ test jako tlačítko „🧪 Otestovat modely“ v aplikaci
+(model_tests.run_model_test), jen bez omezení počtu modelů a bez klikání.
+Výsledky ukládá do CSV.
 
-Spuštění (ve školní síti / VPN):
-    python test_models.py
-    python test_models.py --models qwen3-vl:32b-instruct Qwen3.6-35B-A3B
+Příklady:
+    python test_models.py                                  # školní server, otestované modely z katalogu
+    python test_models.py --provider vse --all             # všechny modely na školním serveru
+    python test_models.py --provider gemini --models gemini-3.8-flash gemini-3.8-pro
+    python test_models.py --provider openrouter --all --free-only
+    python test_models.py --provider ollama --all
 
-Výsledek se uloží do model_benchmark.csv – hodí se jako podklad pro "jaký model a proč".
+API klíč: parametr --key, jinak .streamlit/secrets.toml nebo proměnná prostředí
+(OPENROUTER_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, LITELLM_API_KEY).
 """
 from __future__ import annotations
 
 import argparse
 import csv
-import json
 import os
 import re
+import sys
 import time
 
-from PIL import Image, ImageDraw, ImageFont
+from llm import LLMClient, LLMError
+from model_tests import STATUS_ICON, run_model_test
+from models_catalog import CATALOG
+from providers import PROVIDERS, normalize_model_ids
 
-from cv_parser import image_to_data_url
-from llm import LLMClient, extract_json, inline_refs
-from schemas import JobRequirements
-
-CANDIDATES = [
-    "qwen3-vl:32b-instruct", "qwen3-vl:235b-a22b-instruct", "Qwen3.6-35B-A3B",
-    "Qwen3.8-27B", "gemma-4-12b-it", "ministral-3-8b", "ornith:35b",
-]
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def load_settings() -> dict:
+def read_secret(name: str) -> str:
+    """Hodnota z .streamlit/secrets.toml (řádky KLÍČ = "hodnota"), jinak z prostředí."""
     path = os.path.join(HERE, ".streamlit", "secrets.toml")
-    cfg = {}
-    if os.path.exists(path):
-        # jednoduché čtení řádků KLÍČ = "hodnota" (tomllib je až od Pythonu 3.11)
+    if name and os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             for line in f:
                 m = re.match(r'\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["\']([^"\']*)["\']', line)
-                if m:
-                    cfg[m.group(1)] = m.group(2)
-    return {
-        "key": cfg.get("LITELLM_API_KEY") or os.environ.get("LITELLM_API_KEY"),
-        "url": cfg.get("LITELLM_BASE_URL", "https://litellm.vse.cz/v1"),
-        "user": cfg.get("LITELLM_USER") or os.environ.get("LITELLM_USER"),
-    }
-
-
-def test_image() -> str:
-    img = Image.new("RGB", (700, 160), "white")
-    d = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 40)
-    except OSError:
-        font = ImageFont.load_default()
-    d.text((20, 50), "Skills: Python, SQL, Tableau", fill="black", font=font)
-    return image_to_data_url(img)
+                if m and m.group(1) == name:
+                    return m.group(2)
+    return os.environ.get(name, "") if name else ""
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--models", nargs="*", default=CANDIDATES)
+    ap = argparse.ArgumentParser(description="Hromadný test LLM modelů pro CV Match.")
+    ap.add_argument("--provider", choices=list(PROVIDERS), default="vse")
+    ap.add_argument("--models", nargs="*", help="názvy modelů k otestování")
+    ap.add_argument("--all", action="store_true", help="otestovat všechny modely, které server nabízí")
+    ap.add_argument("--free-only", action="store_true", help="OpenRouter: jen modely :free")
+    ap.add_argument("--key", help="API klíč (jinak secrets.toml / proměnná prostředí)")
+    ap.add_argument("--base-url", help="vlastní adresa serveru (např. Ollama na jiném počítači)")
+    ap.add_argument("--out", default="model_benchmark.csv", help="výstupní CSV")
     args = ap.parse_args()
 
-    s = load_settings()
-    if not s["key"]:
-        raise SystemExit("Chybí API klíč – vyplňte .streamlit/secrets.toml nebo proměnnou LITELLM_API_KEY.")
-    with open(os.path.join(HERE, "samples", "inzerat_ukazka.txt"), encoding="utf-8") as f:
-        job_text = f.read()
-    image = test_image()
-    rows = []
+    prov = PROVIDERS[args.provider]
+    base_url = args.base_url or prov.base_url
+    key = args.key or read_secret(prov.key_setting)
+    user = read_secret("LITELLM_USER") or None if prov.send_user else None
+    if prov.needs_key and not key:
+        sys.exit(f"Chybí API klíč pro {prov.name}: použijte --key nebo nastavte {prov.key_setting}.")
 
-    for model in args.models:
-        print(f"\n=== {model} ===")
-        row = {"model": model}
-        llm = LLMClient(s["url"], s["key"], model=model, user=s["user"], timeout=180,
-                        on_event=lambda m: print("   !", m))
-
-        # 1 + 2) strukturovaný výstup oběma metodami
-        for label, force_json in (("function_calling", False), ("json_mode", True)):
-            t0 = time.time()
-            try:
-                if force_json:  # JSON mód napřímo, bez nástrojů
-                    resp = llm.client.chat.completions.create(
-                        model=model, temperature=0.1, max_tokens=2500,
-                        response_format={"type": "json_object"},
-                        messages=[
-                            {"role": "system", "content": "Odpověz POUZE JSON objektem podle schématu:\n"
-                             + json.dumps(inline_refs(JobRequirements.model_json_schema()), ensure_ascii=False)},
-                            {"role": "user", "content": "Vytáhni požadavky z inzerátu:\n" + job_text},
-                        ])
-                    obj = JobRequirements.model_validate(extract_json(resp.choices[0].message.content or ""))
-                    attempts = 1
-                else:
-                    obj = llm.structured("test", "Vytáhni z inzerátu pozici a VŠECHNY požadavky. Česky.",
-                                         job_text, JobRequirements, max_attempts=2)
-                    attempts = llm.logs[-1].attempts
-                    row["fc_method"] = llm.logs[-1].method
-                row[label] = f"OK ({len(obj.requirements)} pož., {attempts}. pokus)"
-            except Exception as e:  # noqa: BLE001 – chceme zaznamenat jakoukoli chybu
-                row[label] = f"FAIL: {getattr(e, 'user_message', type(e).__name__)}"
-            row[f"{label}_s"] = round(time.time() - t0, 1)
-            print(f"   {label}: {row[label]} ({row[f'{label}_s']} s)")
-            time.sleep(1)
-
-        # 3) vision
-        t0 = time.time()
+    # --- výběr modelů
+    if args.models:
+        models = args.models
+    else:
         try:
-            resp = llm.client.chat.completions.create(
-                model=model, max_tokens=60, temperature=0,
-                messages=[{"role": "user", "content": [
-                    {"type": "text", "text": "Přepiš přesně text na obrázku."},
-                    {"type": "image_url", "image_url": {"url": image}}]}])
-            txt = (resp.choices[0].message.content or "").lower()
-            row["vision"] = "OK" if "python" in txt and "sql" in txt else f"špatně: {txt[:40]!r}"
-        except Exception as e:  # noqa: BLE001
-            row["vision"] = f"FAIL: {type(e).__name__}"
-        row["vision_s"] = round(time.time() - t0, 1)
-        print(f"   vision: {row['vision']} ({row['vision_s']} s)")
-        rows.append(row)
-        time.sleep(1)
+            available = normalize_model_ids(prov, LLMClient(base_url, key, model="-",
+                                                            connection_hint=prov.connection_hint).list_models())
+        except LLMError as e:
+            sys.exit(f"CHYBA: {e.user_message}")
+        if args.free_only:
+            available = [m for m in available if m.endswith(":free")]
+        if args.all:
+            models = available
+        elif args.provider == "vse":  # výchozí: otestované modely z katalogu, které na serveru jsou
+            models = [m for m in CATALOG if m in available and CATALOG[m].verdict != "unsuitable"]
+        else:
+            sys.exit("Zadejte modely přes --models, nebo otestujte všechny přes --all.\n"
+                     f"Server nabízí {len(available)} modelů, např.: {', '.join(available[:8])}")
 
-    out = os.path.join(HERE, "model_benchmark.csv")
-    keys = sorted({k for r in rows for k in r}, key=lambda k: (k != "model", k))
-    with open(out, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=keys)
-        w.writeheader()
-        w.writerows(rows)
-    print(f"\nUloženo do {out}")
+    print(f"Poskytovatel: {prov.name} · modelů k otestování: {len(models)}\n")
+    rows = []
+    for i, model in enumerate(models, start=1):
+        print(f"[{i}/{len(models)}] {model} … ", end="", flush=True)
+        try:
+            r = run_model_test(base_url, key, model, user=user, connection_hint=prov.connection_hint)
+        except LLMError as e:  # nedostupný server / špatný klíč → nemá smysl pokračovat
+            print(f"\nCHYBA: {e.user_message}")
+            break
+        print(f"{r.verdict[0]}  (struktura {STATUS_ICON[r.structured]} {r.structured_note}; "
+              f"vision {STATUS_ICON[r.vision]} {r.vision_note}; {r.structured_s + r.vision_s:.1f} s)")
+        rows.append({"Poskytovatel": prov.name, **r.as_row()})
+        time.sleep(1)  # ohleduplnost ke sdíleným serverům a limitům
+
+    if rows:
+        out = args.out if os.path.isabs(args.out) else os.path.join(HERE, args.out)
+        with open(out, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        print(f"\nUloženo do {out}")
 
 
 if __name__ == "__main__":

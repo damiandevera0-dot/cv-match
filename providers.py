@@ -23,6 +23,7 @@ class Provider:
     send_user: bool = False           # posílat parametr `user` (identifikace u školního serveru)
     connection_hint: str = "Zkontrolujte připojení k internetu."
     privacy: str = ""                 # kam odchází data CV
+    key_setting: str = ""             # nepovinný název klíče v secrets.toml / proměnné prostředí
     # Výchozí model: první vzor, kterému odpovídá nějaký model z nabídky (bere se nejnovější verze).
     preferred: tuple[str, ...] = field(default_factory=tuple)
 
@@ -32,6 +33,7 @@ PROVIDERS: dict[str, Provider] = {
         id="openrouter", name="OpenRouter",
         base_url="https://openrouter.ai/api/v1",
         key_url="https://openrouter.ai/settings/keys", key_placeholder="sk-or-…",
+        key_setting="OPENROUTER_API_KEY",
         privacy="CV se posílá přes OpenRouter vybranému poskytovateli modelu.",
         preferred=(r"^google/gemini-[\d.]+-flash$", r"^openai/gpt-[\d.]+-mini$", r"^qwen/qwen[\d.]*-vl"),
     ),
@@ -39,6 +41,7 @@ PROVIDERS: dict[str, Provider] = {
         id="openai", name="OpenAI",
         base_url="https://api.openai.com/v1",
         key_url="https://platform.openai.com/api-keys", key_placeholder="sk-…",
+        key_setting="OPENAI_API_KEY",
         privacy="CV se posílá společnosti OpenAI.",
         preferred=(r"^gpt-[\d.]+-mini$", r"^gpt-[\d.]+$"),
     ),
@@ -46,6 +49,7 @@ PROVIDERS: dict[str, Provider] = {
         id="gemini", name="Google Gemini",
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         key_url="https://aistudio.google.com/apikey", key_placeholder="AIza…",
+        key_setting="GEMINI_API_KEY",
         privacy="CV se posílá společnosti Google.",
         preferred=(r"^gemini-[\d.]+-flash$", r"^gemini-[\d.]+-pro$"),
     ),
@@ -60,7 +64,7 @@ PROVIDERS: dict[str, Provider] = {
     "vse": Provider(
         id="vse", name="VŠE (školní server)",
         base_url="https://litellm.vse.cz/v1",
-        key_placeholder="sk-… (klíč z Moodlu)", send_user=True,
+        key_placeholder="sk-… (klíč z Moodlu)", send_user=True, key_setting="LITELLM_API_KEY",
         connection_hint="Jste připojeni ke školní síti nebo VPN VŠE?",
         privacy="CV zůstává na školním serveru VŠE.",
     ),
@@ -75,7 +79,9 @@ def _version_key(model_id: str) -> tuple:
 def pick_default(provider: Provider, models: list[str]) -> Optional[str]:
     """Výchozí model z nabídky podle preferovaných vzorů poskytovatele."""
     for pattern in provider.preferred:
-        matches = [m for m in models if re.search(pattern, m, re.IGNORECASE)]
+        # ":free" varianty OpenRouteru posuzujeme podle názvu bez přípony
+        matches = [m for m in models if re.search(pattern, m.removesuffix(":free") if m.endswith(":free")
+                                                  else m, re.IGNORECASE)]
         if matches:
             return max(matches, key=_version_key)
     return None

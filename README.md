@@ -29,9 +29,11 @@ V postranním panelu aplikace zvolte poskytovatele, vložte API klíč a klikně
 
 Všichni poskytovatelé mají OpenAI-kompatibilní API, takže aplikace používá jednu knihovnu (`openai`) a liší se jen adresa a klíč. Pokud server nepodporuje některý parametr (např. `max_tokens` u novějších modelů OpenAI), aplikace ho podle chybové hlášky sama upraví.
 
+U komerčních poskytovatelů a Ollamy není předem jasné, který model zvládá function calling a čtení obrázků. V postranním panelu je proto **🧪 Otestovat modely**: dvě krátká volání na model a verdikt (vhodný / jen textová PDF / nevhodný).
+
 Pro pohodlí při vývoji jde klíč uložit i do `.streamlit/secrets.toml` (viz `secrets.toml.example`) – pole na stránce pak může zůstat prázdné.
 
-Výběr modelu podložíte daty tak, že spustíte `python test_models.py`. Skript otestuje function calling, JSON mód, vision a rychlost a výsledek uloží do `model_benchmark.csv`.
+Modely jde otestovat tlačítkem **🧪 Otestovat modely** v aplikaci, nebo hromadně z terminálu přes `python test_models.py` (např. `--provider gemini --models gemini-3.8-flash`, nebo `--all` pro všechny modely serveru). Oba způsoby používají stejný test (`model_tests.py`) a výsledek ukládají do CSV.
 
 ## Struktura
 
@@ -47,7 +49,8 @@ Výběr modelu podložíte daty tak, že spustíte `python test_models.py`. Skri
 | `lang.py` | rozpoznání jazyka (čeština/angličtina) heuristikou, bez volání modelu |
 | `pricing.py` | aktuální ceny komerčních API (OpenRouter Models API, záložně LiteLLM cost map) |
 | `providers.py` | poskytovatelé modelů (adresa, klíč, výchozí model, poznámka o soukromí) |
-| `test_models.py` | srovnání modelů na školním serveru |
+| `model_tests.py` | test modelu přímo v aplikaci (strukturovaný výstup, vision, rychlost) |
+| `test_models.py` | hromadný test modelů z terminálu (libovolný poskytovatel), stejný test jako v aplikaci |
 
 ### Jazyk úprav CV
 
