@@ -11,6 +11,10 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.2.1] – 2026-11-24
+### Změněno
+- Úpravy textů v rozhraní a změna ikon.
+
 ## [0.2.0] – 2026-11-24
 ### Odebráno
 - Simulace pohovoru v chatu. Záložka se teď jmenuje „Kariérní kouč“.
@@ -31,6 +35,7 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.0...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/damiandevera0-dot/cv-match/releases/tag/v0.1.0

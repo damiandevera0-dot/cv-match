@@ -96,7 +96,7 @@ with st.sidebar:
 
 # ================================================================== vstupy
 ui.hero("🎯 CV Match",
-        "Nahrajte své CV z LinkedIn a pracovní inzerát. Zjistíte, jak dobře na pozici sedíte, "
+        "Nahrajte své CV a pracovní inzerát. Zjistíte, jak dobře na pozici sedíte, "
         "co upravit v CV a kariérní kouč vám pomůže s přípravou.")
 
 
@@ -111,7 +111,7 @@ with col_cv:
     st.markdown("#### 📄 Vaše CV")
     upload = st.file_uploader("CV jako PDF nebo obrázek", type=["pdf", "png", "jpg", "jpeg", "webp"],
                               label_visibility="collapsed")
-    st.caption("Tip: LinkedIn → váš profil → **Další** → **Uložit jako PDF**. "
+    st.caption("Tip: LinkedIn → váš profil → **Další** (či ···) → **Uložit jako PDF**. "
                "Funguje i jiné PDF, sken nebo fotka CV.")
 
 with col_job:
@@ -127,9 +127,9 @@ with col_job:
         if os.path.exists(SAMPLE_JOB_PATH):
             st.button("Vložit ukázkový inzerát", on_click=load_sample_job, type="tertiary")
     else:
-        st.text_input("URL inzerátu", key="job_url", placeholder="https://www.jobs.cz/rpd/…",
+        st.text_input("URL inzerátu", key="job_url", placeholder="https://www.prace.cz/firma/…",
                       label_visibility="collapsed")
-        st.caption("jobs.cz, startupjobs.cz, kariérní stránky firem… (LinkedIn vyžaduje přihlášení → vložte text)")
+        st.caption("prace.cz, startupjobs.cz, kariérní stránky firem… (při problému s odkazem (LinkedIn vyžaduje například přihlášení) → **vložte text**)")
 
 job_url = ss.job_url.strip() if job_mode != MODE_TEXT else ""
 job_text_input = ss.job_text.strip() if job_mode == MODE_TEXT else ""
@@ -228,7 +228,7 @@ st.caption(f"Kandidát: **{profile.name or 'neuvedeno'}** · zdroj inzerátu: {R
            f"inzerát {lang_label(lang.posting)} · CV {lang_label(lang.cv)}")
 
 t_over, t_req, t_edit, t_chat, t_prof, t_log = st.tabs(
-    ["📊 Přehled", "✅ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil", "🔍 Průběh"])
+    ["📊 Přehled", "☑️ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil uchazeče", "🔍 Průběh práce modelu"])
 
 # ------------------------------------------------------------------ přehled
 with t_over:
@@ -247,11 +247,11 @@ with t_over:
                                                for c, v in score.by_category.items()))
     s1, s2 = st.columns(2, gap="large")
     with s1:
-        ui.card("💪 Silné stránky", ui.bullet_list(analysis.strengths))
+        ui.card("📶 Silné stránky", ui.bullet_list(analysis.strengths))
     with s2:
-        ui.card("⚠️ Mezery a rizika", ui.bullet_list(analysis.gaps))
+        ui.card("⚠️ Rizika a mezery", ui.bullet_list(analysis.gaps))
     if analysis.interview_questions:
-        ui.card("🎤 Na co se pravděpodobně zeptají", ui.bullet_list(analysis.interview_questions))
+        ui.card("Na co se pravděpodobně zeptají", ui.bullet_list(analysis.interview_questions))
 
 # ------------------------------------------------------------------ požadavky
 with t_req:
@@ -404,6 +404,6 @@ with t_log:
         st.caption("Školní server je pro vás zdarma. Pro reflexi doplňte aktuální ceník zvoleného poskytovatele "
                    "(USD za 1 milion tokenů).")
         k1, k2, k3 = st.columns(3)
-        p_in = k1.number_input("Cena vstup / 1M", min_value=0.0, value=0.0, step=0.05)
-        p_out = k2.number_input("Cena výstup / 1M", min_value=0.0, value=0.0, step=0.1)
+        p_in = k1.number_input("Cena vstup (USD) / 1M", min_value=0.0, value=0.0, step=0.05)
+        p_out = k2.number_input("Cena výstup (USD) / 1M", min_value=0.0, value=0.0, step=0.1)
         k3.metric("Odhad ceny", f"${(tin * p_in + tout * p_out) / 1e6:.4f}")

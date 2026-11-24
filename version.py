@@ -1,2 +1,2 @@
 """Verze aplikace podle Semantic Versioning (MAJOR.MINOR.PATCH), viz CHANGELOG.md."""
-__version__ = "0.2.0"
+__version__ = "0.2.1"
