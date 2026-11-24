@@ -11,6 +11,22 @@ Dokud je verze `0.x`, projekt je ve vývoji. Verze `1.0.0` = stav odevzdaný k o
 
 ## [Nevydáno]
 
+## [0.5.0] – 2026-11-24
+### Přidáno
+- Výběr poskytovatele modelů: OpenRouter, OpenAI, Google Gemini, Ollama (lokálně) a školní server VŠE
+  (nový modul `providers.py`).
+- Pole pro API klíč přímo v postranním panelu. Klíč se drží jen v paměti relace a nikam se neukládá.
+- Tlačítko „Připojit a načíst modely“; výchozí model se vybere podle poskytovatele
+  (nejnovější odpovídající model, např. Gemini Flash).
+- Poznámka o soukromí: kam odchází data CV u zvoleného poskytovatele.
+- Automatické přizpůsobení parametrů, které server nepodporuje (`max_tokens` →
+  `max_completion_tokens`, `temperature`, `stream_options`).
+
+### Změněno
+- Aplikace už nevyžaduje `secrets.toml`; klíč v něm je jen nepovinná pohodlnější varianta.
+- Chybové hlášky o nedostupném serveru jsou podle poskytovatele (např. „Běží Ollama?“, „Jste ve školní síti?“).
+- Analýzu nejde spustit, dokud není vybraný model.
+
 ## [0.4.0] – 2026-11-24
 ### Přidáno
 - Aktuální ceny komerčních API v záložce „Průběh práce modelu“: aplikace stáhne ceníky
@@ -68,7 +84,8 @@ První verze nahraná na GitHub.
 - Ošetření chyb: retry, záložní model, oprava nevalidního JSONu, srozumitelné hlášky.
 - Skript `test_models.py` pro srovnání modelů na školním serveru.
 
-[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...HEAD
+[Nevydáno]: https://github.com/damiandevera0-dot/cv-match/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/damiandevera0-dot/cv-match/compare/v0.3.0...v0.3.1

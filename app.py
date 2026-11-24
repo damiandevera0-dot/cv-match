@@ -1,4 +1,4 @@
-"""CV Match – porovnání LinkedIn CV s pracovním inzerátem pomocí školního LLM.
+"""CV Match – porovnání CV s pracovním inzerátem pomocí LLM (OpenRouter, OpenAI, Gemini, Ollama, VŠE).
 
 Spuštění:  streamlit run app.py
 """
@@ -20,6 +20,7 @@ from version import __version__
 from pricing import PROVIDERS, PriceList, PricingError, cost_usd, default_selection, fetch_prices
 
 from models_catalog import CATALOG, DEFAULT_FALLBACK, DEFAULT_MODEL, default_suitable, split_models
+from providers import PROVIDERS as LLM_PROVIDERS, normalize_model_ids, pick_default
 SAMPLE_JOB_PATH = os.path.join(os.path.dirname(__file__), "samples", "inzerat_ukazka.txt")
 
 st.set_page_config(page_title="CV Match", page_icon="🎯", layout="wide")
@@ -37,15 +38,16 @@ def setting(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
 
-BASE_URL = setting("LITELLM_BASE_URL", "https://litellm.vse.cz/v1")
-API_KEY = setting("LITELLM_API_KEY")
-LOGIN = setting("LITELLM_USER")
+# Nepovinné: klíč může být i v .streamlit/secrets.toml / proměnné prostředí (pohodlí při vývoji).
+# Běžně ho uživatel zadá přímo na stránce a drží se jen v paměti relace.
+KEY_SETTING = {"openrouter": "OPENROUTER_API_KEY", "openai": "OPENAI_API_KEY",
+               "gemini": "GEMINI_API_KEY", "vse": "LITELLM_API_KEY"}
 
 ss = st.session_state
 ss.setdefault("logs", [])          # log všech LLM volání (sdílený napříč reruny)
 ss.setdefault("result", None)      # výsledek poslední analýzy
 ss.setdefault("chat", [])          # historie chatu
-ss.setdefault("models", None)
+ss.setdefault("models_by", {})     # načtené modely pro každého poskytovatele
 ss.setdefault("job_text", "")
 ss.setdefault("job_url", "")
 NAV_VIEWS = ["📊 Přehled", "☑️ Požadavky", "✍️ Úpravy CV", "💬 Kariérní kouč", "👤 Profil uchazeče",
@@ -59,11 +61,16 @@ ss.setdefault("job_mode", MODE_URL)
 ss.job_text, ss.job_url = ss.job_text, ss.job_url
 if "price_models" in ss:  # výběr modelů v ceníku přežije přepnutí sekce
     ss.price_models = ss.price_models
+for _k in [k for k in ss.keys() if str(k).startswith(("key_", "url_"))]:
+    ss[_k] = ss[_k]  # klíče a adresy ostatních poskytovatelů přežijí přepnutí (jen v paměti relace)
 
 
 def make_llm(model: str, fallback: str | None) -> LLMClient:
-    llm = LLMClient(BASE_URL, API_KEY, model=model, fallback_model=fallback, user=LOGIN or None,
-                    on_event=lambda m: st.toast(m, icon="⚠️"))
+    if not model:
+        raise LLMError("Nejdřív v postranním panelu vyberte poskytovatele a model.")
+    llm = LLMClient(base_url, api_key, model=model, fallback_model=fallback,
+                    user=(login or None) if prov.send_user else None,
+                    on_event=lambda m: st.toast(m, icon="⚠️"), connection_hint=prov.connection_hint)
     llm.logs = ss.logs  # všechna volání do jednoho logu
     return llm
 
@@ -71,50 +78,89 @@ def make_llm(model: str, fallback: str | None) -> LLMClient:
 # ================================================================== sidebar
 with st.sidebar:
     st.markdown("### ⚙️ Nastavení")
-    if not API_KEY:
-        st.error("Chybí API klíč. Vytvořte soubor `.streamlit/secrets.toml` podle "
-                 "`secrets.toml.example` a aplikaci restartujte.")
-        st.stop()
 
-    if st.button("Otestovat připojení", use_container_width=True):
-        try:
-            ss.models = LLMClient(BASE_URL, API_KEY, DEFAULT_MODEL).list_models()
-        except LLMError as e:
-            st.error(e.user_message)
-
-    # --- filtr modelů: ze serveru nabízíme jen ty, které prošly testy (models_catalog.py)
-    if ss.models is not None:
-        suitable, others = split_models(ss.models)
-        st.success(f"Připojeno · na serveru {len(ss.models)} modelů, vhodných {len(suitable)}")
-        if not suitable:
-            st.warning("Žádný z otestovaných modelů teď na serveru není. Zobrazuji všechny.")
+    # --- poskytovatel a přístupové údaje
+    pid = st.selectbox("Poskytovatel modelů", list(LLM_PROVIDERS), key="provider",
+                       format_func=lambda p: LLM_PROVIDERS[p].name)
+    prov = LLM_PROVIDERS[pid]
+    if prov.url_editable:
+        ss.setdefault(f"url_{pid}", prov.base_url)
+        base_url = st.text_input("Adresa serveru", key=f"url_{pid}",
+                                 help="Když aplikace běží v cloudu, `localhost` je server, ne váš počítač.")
     else:
-        suitable, others = default_suitable(), []
-        st.caption("Otestujte připojení, aby se nabídly jen modely, které na serveru opravdu jsou.")
+        base_url = prov.base_url
 
-    show_all = st.toggle("Zobrazit i nevhodné modely", value=not suitable, disabled=not others,
-                         help="Modely, které neprošly testy, nebo nebyly otestované. Jen pro experimenty.")
-    options = suitable + (others if show_all else [])
+    api_key, login = "", ""
+    if prov.needs_key:
+        api_key = st.text_input(
+            "API klíč", type="password", key=f"key_{pid}", placeholder=prov.key_placeholder,
+            help="Klíč se drží jen v paměti této relace a nikam se neukládá. Po zavření stránky zmizí.")
+        if not api_key and setting(KEY_SETTING.get(pid, "")):
+            api_key = setting(KEY_SETTING[pid])
+            st.caption("Použit klíč ze `secrets.toml` / proměnné prostředí.")
+        elif prov.key_url:
+            st.caption(f"Klíč získáte na [{prov.key_url.split('/')[2]}]({prov.key_url}).")
+    if prov.send_user:
+        ss.setdefault("url_vse_login", setting("LITELLM_USER"))
+        login = st.text_input("Login VŠE (nepovinné)", key="url_vse_login", placeholder="xlogin00")
 
-    model = st.selectbox("Hlavní model", options,
-                         index=options.index(DEFAULT_MODEL) if DEFAULT_MODEL in options else 0,
-                         help="Musí umět function calling. Pro CV jako obrázek musí umět i vision.")
-    fb_options = ["— žádný —"] + [m for m in options if m != model]
-    fallback = st.selectbox("Záložní model (při výpadku)", fb_options,
-                            index=fb_options.index(DEFAULT_FALLBACK) if DEFAULT_FALLBACK in fb_options else 0)
-    fallback = None if fallback.startswith("—") else fallback
+    can_connect = bool(api_key) or not prov.needs_key
+    if st.button("🔌 Připojit a načíst modely", use_container_width=True, disabled=not can_connect):
+        try:
+            ids = LLMClient(base_url, api_key, model="-", connection_hint=prov.connection_hint).list_models()
+            ss.models_by[pid] = normalize_model_ids(prov, ids)
+        except LLMError as e:
+            ss.models_by.pop(pid, None)
+            st.error(e.user_message)
+    models_list = ss.models_by.get(pid)
 
-    with st.expander("Proč jen tyto modely?"):
-        st.caption("Aplikace potřebuje strukturovaný výstup (function calling) a čtení obrázků (vision). "
-                   "Hodnocení vychází z `test_models.py`.")
-        rows = [f"- **{name}** · {i.badge}  \n  {i.reason}" for name, i in CATALOG.items()
-                if ss.models is None or name in ss.models]
-        st.markdown("\n".join(rows))
+    # --- výběr modelu
+    model, fallback = None, None
+    if pid == "vse":
+        # školní server: jen modely, které prošly testy (models_catalog.py)
+        if models_list is not None:
+            suitable, others = split_models(models_list)
+            st.success(f"Připojeno · na serveru {len(models_list)} modelů, vhodných {len(suitable)}")
+        else:
+            suitable, others = default_suitable(), []
+        show_all = st.toggle("Zobrazit i nevhodné modely", value=not suitable, disabled=not others,
+                             help="Modely, které neprošly testy, nebo nebyly otestované.")
+        options = suitable + (others if show_all else [])
+        default_main, default_fb = DEFAULT_MODEL, DEFAULT_FALLBACK
+    elif models_list:
+        st.success(f"Připojeno · {len(models_list)} modelů")
+        options = models_list
+        default_main, default_fb = pick_default(prov, options), None
+    else:
+        options = []
+        if models_list is not None:
+            st.warning("Poskytovatel nevrátil žádné modely.")
+        elif can_connect:
+            st.info("Klikněte na **Připojit** a vyberte model.")
+        else:
+            st.info("Zadejte API klíč a klikněte na **Připojit**.")
+
+    if options:
+        model = st.selectbox("Hlavní model", options,
+                             index=options.index(default_main) if default_main in options else 0,
+                             help="Musí umět function calling. Pro CV jako obrázek musí umět i vision.")
+        fb_options = ["— žádný —"] + [m for m in options if m != model]
+        fb = st.selectbox("Záložní model (při výpadku)", fb_options,
+                          index=fb_options.index(default_fb) if default_fb in fb_options else 0)
+        fallback = None if fb.startswith("—") else fb
+
+    if pid == "vse":
+        with st.expander("Proč jen tyto modely?"):
+            st.caption("Aplikace potřebuje strukturovaný výstup (function calling) a čtení obrázků (vision). "
+                       "Hodnocení vychází z `test_models.py`.")
+            rows = [f"- **{name}** · {i.badge}  \n  {i.reason}" for name, i in CATALOG.items()
+                    if models_list is None or name in models_list]
+            st.markdown("\n".join(rows))
     want_edits = st.toggle("Navrhnout úpravy CV", value=True, help="Jedno LLM volání navíc.")
 
     st.divider()
-    st.caption(f"CV Match v{__version__} · Server: `{BASE_URL}`")
-    st.caption("Data CV zůstávají na školním serveru VŠE – nic se neposílá komerčním poskytovatelům.")
+    st.caption(f"🔒 {prov.privacy}")
+    st.caption(f"CV Match v{__version__} · {prov.name}")
     if ss.result and st.button("🔄 Nová analýza", use_container_width=True):
         ss.result, ss.chat = None, []
         st.rerun()
@@ -161,9 +207,11 @@ job_url = ss.job_url.strip() if job_mode != MODE_TEXT else ""
 job_text_input = ss.job_text.strip() if job_mode == MODE_TEXT else ""
 has_job = bool(job_url or job_text_input)
 run = st.button("Analyzovat shodu →", type="primary", use_container_width=True,
-                disabled=not (upload and has_job))
+                disabled=not (upload and has_job and model))
 hint = st.empty()  # vždy stejné místo v rozvržení, i když je nápověda skrytá
-if not (upload and has_job):
+if not model:
+    hint.caption("⬅️ Nejdřív v postranním panelu vyberte poskytovatele, zadejte API klíč a připojte se.")
+elif not (upload and has_job):
     hint.caption("Nahrajte CV a zadejte inzerát – " +
                ("vložte jeho text." if job_mode == MODE_TEXT else "vložte odkaz."))
 
@@ -447,9 +495,9 @@ if view == V_CHAT:
         chat_box.chat_message("user", avatar="🧑").write(user_text)
         system = chat_system_prompt(profile, job, analysis, score, lang)
         history = [{"role": m["role"], "content": m["content"]} for m in ss.chat[-14:]]  # paměť: posl. 14 zpráv
-        llm = make_llm(model, fallback)
         with chat_box.chat_message("assistant", avatar="🎯"):
             try:
+                llm = make_llm(model, fallback)
                 answer = st.write_stream(llm.chat_stream("Kariérní kouč", [{"role": "system", "content": system}] + history))
                 ss.chat.append({"role": "assistant", "content": answer})
             except LLMError as e:

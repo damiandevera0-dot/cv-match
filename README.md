@@ -2,7 +2,9 @@
 
 Semestrální práce 4IZ233 Generativní AI, téma 2: středně složitá aplikace.
 
-Webová aplikace (Streamlit), která porovná **CV z LinkedIn** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem. Běží nad školním LLM serverem `litellm.vse.cz`.
+Webová aplikace (Streamlit), která porovná **CV z LinkedIn** s **pracovním inzerátem**. Ukáže skóre shody, vyhodnotí jednotlivé požadavky, navrhne úpravy CV a nabídne chat s kariérním koučem. Funguje s modely od OpenRouteru, OpenAI, Google Gemini, s lokální Ollamou i se školním serverem VŠE.
+
+> Verze odevzdaná k obhajobě (jen školní server VŠE) je ve větvi `vse-fis-school`.
 
 ## Spuštění
 
@@ -10,12 +12,24 @@ Webová aplikace (Streamlit), která porovná **CV z LinkedIn** s **pracovním i
 python -m venv .venv
 .venv\Scripts\activate          # Windows  (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
-
-copy .streamlit\secrets.toml.example .streamlit\secrets.toml   # a doplňte klíč a login
 streamlit run app.py
 ```
 
-Potřebujete **školní síť nebo VPN VŠE** a Python 3.9+.
+V postranním panelu aplikace zvolte poskytovatele, vložte API klíč a klikněte na **Připojit a načíst modely**. Klíč se drží jen v paměti relace prohlížeče a nikam se neukládá. Potřebujete Python 3.9+.
+
+## Poskytovatelé modelů
+
+| Poskytovatel | API klíč | Poznámka |
+|---|---|---|
+| OpenRouter | [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) | jeden klíč pro modely mnoha firem, i bezplatné (s denním limitem) |
+| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | placené |
+| Google Gemini | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | bezplatná vrstva s limity |
+| Ollama (lokálně) | není potřeba | zdarma, CV neopustí počítač; potřebuje nainstalovanou Ollamu a vision model |
+| VŠE (školní server) | z Moodlu kurzu | jen ve školní síti nebo přes VPN |
+
+Všichni poskytovatelé mají OpenAI-kompatibilní API, takže aplikace používá jednu knihovnu (`openai`) a liší se jen adresa a klíč. Pokud server nepodporuje některý parametr (např. `max_tokens` u novějších modelů OpenAI), aplikace ho podle chybové hlášky sama upraví.
+
+Pro pohodlí při vývoji jde klíč uložit i do `.streamlit/secrets.toml` (viz `secrets.toml.example`) – pole na stránce pak může zůstat prázdné.
 
 Výběr modelu podložíte daty tak, že spustíte `python test_models.py`. Skript otestuje function calling, JSON mód, vision a rychlost a výsledek uloží do `model_benchmark.csv`.
 
@@ -32,6 +46,7 @@ Výběr modelu podložíte daty tak, že spustíte `python test_models.py`. Skri
 | `job_fetcher.py` | URL inzerátu → text (JSON-LD JobPosting / HTML), srozumitelné chyby |
 | `lang.py` | rozpoznání jazyka (čeština/angličtina) heuristikou, bez volání modelu |
 | `pricing.py` | aktuální ceny komerčních API (OpenRouter Models API, záložně LiteLLM cost map) |
+| `providers.py` | poskytovatelé modelů (adresa, klíč, výchozí model, poznámka o soukromí) |
 | `test_models.py` | srovnání modelů na školním serveru |
 
 ### Jazyk úprav CV

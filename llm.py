@@ -1,4 +1,4 @@
-"""Klient pro školní LiteLLM server (OpenAI-kompatibilní API).
+"""Klient pro libovolné OpenAI-kompatibilní API (OpenRouter, OpenAI, Gemini, Ollama, VŠE LiteLLM).
 
 Co tu je navíc oproti holému volání `client.chat.completions.create`:
   * structured()   – strukturovaný výstup přes function calling + validace Pydanticem
@@ -113,13 +113,41 @@ class LLMClient:
         user: Optional[str] = None,
         timeout: float = 120,
         on_event: Optional[Callable[[str], None]] = None,
+        connection_hint: str = "Zkontrolujte připojení k internetu.",
     ):
-        self.client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)
+        # Ollama klíč nepotřebuje, ale knihovna openai vyžaduje neprázdnou hodnotu.
+        self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed", timeout=timeout,
+                             max_retries=0)
+        self.connection_hint = connection_hint
+        self._param_fixes: set[str] = set()  # úpravy parametrů, které si vyžádal server
         self.model = model
         self.fallback_model = fallback_model if fallback_model and fallback_model != model else None
         self.user = user
         self.on_event = on_event or (lambda msg: None)  # UI si sem pověsí st.toast
         self.logs: list[CallLog] = []
+
+    # ---------------------------------------------------------- přizpůsobení parametrů
+    @staticmethod
+    def _apply_fix(kwargs: dict, fix: str) -> bool:
+        if fix == "max_completion_tokens" and "max_tokens" in kwargs:
+            kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
+            return True
+        if fix in ("temperature", "stream_options") and fix in kwargs:
+            kwargs.pop(fix)
+            return True
+        return False
+
+    def _adapt_params(self, kwargs: dict, message: str) -> Optional[str]:
+        """Poskytovatelé se liší v podporovaných parametrech (např. novější modely OpenAI
+        nepřijímají `max_tokens` ani vlastní `temperature`). Podle chybové hlášky parametr
+        upravíme, zapamatujeme si to a zkusíme volání znovu."""
+        msg = message.lower()
+        for fix, trigger in (("max_completion_tokens", "max_tokens"), ("temperature", "temperature"),
+                             ("stream_options", "stream_options")):
+            if trigger in msg and self._apply_fix(kwargs, fix):
+                self._param_fixes.add(fix)
+                return fix
+        return None
 
     # ---------------------------------------------------------- nízkoúrovňové volání
     def _create(self, log: CallLog, **kwargs):
@@ -127,8 +155,11 @@ class LLMClient:
         models = [self.model] + ([self.fallback_model] if self.fallback_model else [])
         last_exc: Exception | None = None
 
+        for fix in self._param_fixes:  # úpravy naučené z dřívějších volání
+            self._apply_fix(kwargs, fix)
+
         for model in models:
-            for attempt in range(3):
+            for attempt in range(4):
                 try:
                     if self.user:
                         kwargs.setdefault("user", self.user)
@@ -136,16 +167,14 @@ class LLMClient:
                     return self.client.chat.completions.create(model=model, **kwargs)
 
                 except openai.AuthenticationError as e:
-                    raise LLMError("Neplatný API klíč – zkontrolujte ho v nastavení (secrets.toml).", str(e))
+                    raise LLMError("Neplatný API klíč – zkontrolujte ho v postranním panelu.", str(e))
 
                 except openai.APIConnectionError as e:  # zahrnuje i APITimeoutError
                     last_exc = e
                     if isinstance(e, openai.APITimeoutError):
                         log.notes.append(f"{model}: timeout klienta")
                         break  # timeout → rovnou zkus záložní model
-                    raise LLMError(
-                        "Server LiteLLM není dostupný. Jste připojeni ke školní síti nebo VPN VŠE?", str(e)
-                    )
+                    raise LLMError(f"Server poskytovatele není dostupný. {self.connection_hint}", str(e))
 
                 except openai.RateLimitError as e:  # 429 – sdílený klíč je přetížený
                     last_exc = e
@@ -159,7 +188,11 @@ class LLMClient:
                     log.notes.append(f"{model}: model nenalezen")
                     break
 
-                except openai.BadRequestError:
+                except openai.BadRequestError as e:
+                    fix = self._adapt_params(kwargs, str(e))
+                    if fix:
+                        log.notes.append(f"server nepodporuje parametr → úprava ({fix})")
+                        continue
                     raise  # řeší volající (např. nepodporované nástroje)
 
                 except openai.APIStatusError as e:  # 5xx, typicky 504 Gateway Time-out
@@ -339,4 +372,6 @@ class LLMClient:
         except openai.AuthenticationError as e:
             raise LLMError("Neplatný API klíč.", str(e))
         except openai.APIConnectionError as e:
-            raise LLMError("Server LiteLLM není dostupný. Jste ve školní síti / VPN?", str(e))
+            raise LLMError(f"Server poskytovatele není dostupný. {self.connection_hint}", str(e))
+        except openai.APIStatusError as e:
+            raise LLMError(f"Server vrátil chybu HTTP {e.status_code} při načítání modelů.", str(e))
