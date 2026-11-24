@@ -1,0 +1,31 @@
+Junior Data Analyst (m/ž) – Praha
+Společnost: Datová Kavárna s.r.o. (fiktivní firma pro ukázku)
+
+Hledáme do našeho analytického týmu juniorního datového analytika, který bude pomáhat obchodnímu oddělení rozumět datům o zákaznících a prodejích.
+
+Co budeš dělat:
+- připravovat reporty a dashboardy v Power BI pro obchod a marketing
+- psát SQL dotazy nad firemní databází (PostgreSQL)
+- čistit a analyzovat data v Pythonu (pandas)
+- spolupracovat s kolegy na A/B testech a vyhodnocovat jejich výsledky
+- prezentovat zjištění vedení srozumitelnou formou
+
+Co od tebe očekáváme:
+- VŠ vzdělání ekonomického, matematického nebo informatického směru (i studenti posledních ročníků)
+- dobrou znalost SQL
+- základy Pythonu (pandas, ideálně i vizualizace – matplotlib / seaborn)
+- zkušenost s Power BI nebo Tableau
+- znalost základů statistiky (testování hypotéz, regrese)
+- angličtinu alespoň na úrovni B2
+- analytické myšlení, pečlivost a schopnost srozumitelně vysvětlit výsledky
+
+Výhodou:
+- zkušenost s Google Analytics 4
+- znalost dbt nebo Airflow
+- praxe v e-commerce
+
+Nabízíme:
+- flexibilní pracovní dobu a home office 2 dny v týdnu
+- 25 dní dovolené
+- mentoring od seniorních analytiků
+- multisport kartu a příspěvek na vzdělávání
